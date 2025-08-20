@@ -41,11 +41,8 @@
     document.addEventListener('DOMContentLoaded', function() {
       const topicsContainer = document.getElementById('topics-container');
       
-      function loadTopics() {
-        const topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
-        
-        if (topics.length === 0) {
-          topicsContainer.innerHTML = `
+      function showEmptyState() {
+        topicsContainer.innerHTML = `
             <div class="empty-state">
               <i class="material-icons">folder_open</i>
               <p>Chưa có chuyên đề nào</p>
@@ -53,9 +50,9 @@
                 <i class="material-icons">add_circle</i> Tạo chuyên đề mới
               </a>
             </div>`;
-          return;
-        }
-
+      }
+      
+      function renderTopics(topics) {
         topicsContainer.innerHTML = topics.map(topic => `
           <div class="topic-card">
             <div class="topic-card-content">
@@ -68,7 +65,26 @@
           </div>
         `).join('');
       }
-
+      
+      function loadTopics() {
+        const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+        if (localTopics.length > 0) {
+          renderTopics(localTopics);
+          return;
+        }
+        fetch('topics.json', { cache: 'no-store' })
+          .then(resp => resp.ok ? resp.json() : [])
+          .then(remoteTopics => {
+            if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
+              localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
+              renderTopics(remoteTopics);
+            } else {
+              showEmptyState();
+            }
+          })
+          .catch(() => showEmptyState());
+      }
+      
       loadTopics();
     });
   </script>

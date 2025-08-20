@@ -92,16 +92,37 @@
     const resultArea = document.getElementById('result');
 
     // Quiz state
-    let topicId = getTopicId();
-    let topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
-    let topic = topics.find(t => t.id === topicId);
+    let topicId = null;
+    let topics = [];
+    let topic = null;
     let questions = [];
     let currentQuestionIndex = 0;
     let userAnswers = [];
     let quizSubmitted = false;
 
     // Initialize quiz
-    function initQuiz() {
+    async function initQuiz() {
+      // Load topic from localStorage or fallback to topics.json
+      topicId = getTopicId();
+      topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+      topic = topics.find(t => t.id === topicId);
+      
+      if (!topic) {
+        try {
+          const resp = await fetch('topics.json', { cache: 'no-store' });
+          if (resp.ok) {
+            const remoteTopics = await resp.json();
+            if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
+              localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
+              topics = remoteTopics;
+              topic = topics.find(t => t.id === topicId);
+            }
+          }
+        } catch (e) {
+          // ignore fetch errors and fall through to error display
+        }
+      }
+      
       if (!topic) {
         showError('Không tìm thấy chuyên đề!');
         return;
@@ -231,13 +252,14 @@
       prevBtn.disabled = currentQuestionIndex === 0;
       nextBtn.disabled = currentQuestionIndex === questions.length - 1;
       
-      // Show/hide submit button on last question
+      // Submit is always available
+      submitBtn.style.display = 'inline-flex';
+      
+      // Hide next on last question
       if (currentQuestionIndex === questions.length - 1) {
         nextBtn.style.display = 'none';
-        submitBtn.style.display = 'inline-flex';
       } else {
         nextBtn.style.display = 'inline-flex';
-        submitBtn.style.display = 'none';
       }
     }
 
@@ -297,7 +319,7 @@
             <div class="flagged-question" data-index="${index}">
               <div class="question">${index + 1}. ${q.question}</div>
               <div class="answer-status ${isCorrect ? 'correct' : 'incorrect'}">
-                ${isCorrect ? '✓ Đã trả lời đúng' : '✗ Chưa trả lời đúng'}
+                ${isCorrect ? '✓ Đã trả lời đúng' : '✗ Chưa trả lời'}
               </div>
               ${quizSubmitted && q.explain ? `
                 <div class="explanation">
@@ -328,6 +350,7 @@
     }
 
     function submitQuiz() {
+      if (quizSubmitted) return;
       if (confirm('Bạn có chắc chắn muốn nộp bài không?')) {
         quizSubmitted = true;
         showResults();
@@ -351,12 +374,34 @@
             <a href="index.html" class="btn">
               <i class="material-icons">home</i> Về trang chủ
             </a>
-            <button onclick="window.location.reload()" class="btn btn-outline">
+            <button id="restart-btn" class="btn btn-outline">
               <i class="material-icons">refresh</i> Làm lại
             </button>
           </div>
         </div>
       `;
+      resultArea.style.display = 'block';
+      
+      // Attach restart handler once results are shown
+      const restartBtn = document.getElementById('restart-btn');
+      if (restartBtn) {
+        restartBtn.addEventListener('click', () => {
+          // Clear quiz progress and reset state to the very beginning
+          localStorage.removeItem(`quiz_progress_${topicId}`);
+          quizSubmitted = false;
+          userAnswers = questions.map(() => ({
+            answer: null,
+            correct: null,
+            flagged: false,
+            explanationShown: false
+          }));
+          currentQuestionIndex = 0;
+          resultArea.innerHTML = '';
+          resultArea.style.display = 'none';
+          showQuestion(0);
+          saveProgress();
+        }, { once: true });
+      }
       
       // Show all explanations for review
       questions.forEach((q, index) => {

@@ -117,8 +117,19 @@
           <!-- Danh sách chuyên đề sẽ được hiển thị ở đây -->
         </div>
       </div>
+      
+      <div class="mt-4">
+        <button id="export-json-btn" class="btn">
+          <i class="material-icons">file_download</i> Tải xuống topics.json
+        </button>
+        <button id="import-json-btn" class="btn btn-outline" style="margin-left: 8px;">
+          <i class="material-icons">file_upload</i> Cập nhật từ topics.json
+        </button>
+      </div>
     </div>
   </div>
+
+  
 
   <script>
     // Admin credentials (in a real app, this should be server-side)
@@ -320,6 +331,11 @@
         };
         reader.readAsBinaryString(file);
       });
+      
+      // Export topics.json for publishing shared data
+      document.getElementById('export-json-btn').addEventListener('click', exportTopicsJson);
+      // Import topics from topics.json (overwrite local)
+      document.getElementById('import-json-btn').addEventListener('click', importTopicsFromJson);
     });
 
     // Your existing topic management functions here
@@ -370,6 +386,43 @@
       saveTopics(topics);
       renderTopics();
     };
+    
+    function exportTopicsJson() {
+      const topics = getTopics();
+      const blob = new Blob([JSON.stringify(topics, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'topics.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function importTopicsFromJson() {
+      try {
+        const resp = await fetch('topics.json', { cache: 'no-store' });
+        if (!resp.ok) {
+          alert('Không tải được topics.json từ máy chủ!');
+          return;
+        }
+        const data = await resp.json();
+        if (!Array.isArray(data)) {
+          alert('File topics.json không đúng định dạng (phải là mảng).');
+          return;
+        }
+        if (!confirm('Thao tác này sẽ ghi đè toàn bộ chuyên đề hiện tại trên máy bạn bằng dữ liệu trong topics.json. Tiếp tục?')) {
+          return;
+        }
+        saveTopics(data);
+        renderTopics();
+        alert('Đã cập nhật chuyên đề từ topics.json thành công!');
+      } catch (e) {
+        alert('Lỗi khi đọc topics.json. Vui lòng thử lại.');
+        console.error(e);
+      }
+    }
   </script>
 </body>
 </html>

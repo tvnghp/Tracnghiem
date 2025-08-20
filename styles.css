@@ -72,7 +72,9 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   transition: all 0.3s ease;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn:hover {
@@ -198,7 +200,7 @@ textarea:focus {
 
 .quiz-actions {
   display: flex;
-  gap: 10px;
+  gap: 16px;
 }
 
 .btn-flag {
@@ -1056,14 +1058,14 @@ textarea:focus {
 }
 
 .answer:hover {
-  background: #f1f3f5;
-  border-color: #ced4da;
+  background: rgba(128, 0, 32, 0.08);
+  border-color: var(--primary-color);
 }
 
 .answer.selected {
-  background: #e6f7ff;
-  border-color: #91d5ff;
-  color: #096dd9;
+  background: rgba(128, 0, 32, 0.15);
+  border-color: var(--primary-color);
+  color: inherit;
 }
 
 .answer.correct {
@@ -1133,7 +1135,7 @@ textarea:focus {
 .score {
   font-size: 3.5rem;
   font-weight: 700;
-  color: #1890ff;
+  color: var(--primary-color);
   line-height: 1;
 }
 
@@ -1216,7 +1218,7 @@ textarea:focus {
 
 #progress-bar {
   height: 100%;
-  background: #1890ff;
+  background: var(--primary-color);
   width: 0;
   transition: width 0.3s ease;
 }
@@ -1447,14 +1449,14 @@ textarea:focus {
 
 /* Button styles */
 .btn-danger {
-  background-color: #dc3545;
+  background-color: var(--primary-color);
   color: white;
-  border: 1px solid #dc3545;
+  border: 1px solid var(--primary-color);
 }
 
 .btn-danger:hover {
-  background-color: #c82333;
-  border-color: #bd2130;
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
 }
 
 .btn-icon {
@@ -1499,7 +1501,7 @@ textarea:focus {
 
 .quiz-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 5rem; /* increase spacing between flag and submit buttons */
 }
 
 /* Answer feedback */
