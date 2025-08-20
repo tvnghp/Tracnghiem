@@ -147,7 +147,10 @@
       
       if (!topic) {
         try {
-          const resp = await fetch('topics.json', { cache: 'no-store' });
+          // CHỈNH: dùng đường dẫn tương đối + cache-busting
+          const url = new URL('./topics.json', location.href);
+          url.searchParams.set('v', Date.now());
+          const resp = await fetch(url, { cache: 'no-store' });
           if (resp.ok) {
             const remoteTopics = await resp.json();
             if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
