@@ -777,6 +777,14 @@ textarea:focus {
   border-top: 1px solid #eee;
 }
 
+/* Admin actions button row */
+.admin-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 /* Responsive adjustments for small screens */
 @media (max-width: 480px) {
   .topic-item {
@@ -1539,4 +1547,27 @@ textarea:focus {
   margin-left: auto;
   color: #c62828;
   font-weight: bold;
+}
+
+/* Override flag button to match primary buttons and be larger */
+.btn-flag {
+  background: var(--primary-color);
+  color: #fff;
+  border: 2px solid var(--primary-color);
+  padding: 10px 16px;
+  border-radius: var(--border-radius-md);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  white-space: nowrap;
+  font-size: 1rem;
+}
+
+.btn-flag:hover,
+.btn-flag.active {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
 }

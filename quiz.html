@@ -13,7 +13,7 @@
       <div class="logo">
         <img src="logo.png" alt="Logo" id="logo-img">
         <div class="logo-text">
-          <h1>HỆ THỐNG TRẮC NGHIỆM AGRIBANK CHI NHÁNH CẦN THƠ II</h1>
+          <h1>HỆ THỐNG TRẮC NGHIỆM CHI NHÁNH CẦN THƠ II</h1>
           <p id="topic-name"></p>
         </div>
       </div>
@@ -100,6 +100,44 @@
     let userAnswers = [];
     let quizSubmitted = false;
 
+    // Shuffle helpers
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function shuffleOptions(question) {
+      const letterPool = ["A", "B", "C", "D"];
+      const pairs = (question.optionLabels || []).map((label, idx) => ({
+        label: label,
+        text: question.options[idx]
+      }));
+      // determine correct option text before shuffling
+      const correctIndex = (question.optionLabels || []).indexOf(question.answer);
+      const correctText = correctIndex >= 0 ? question.options[correctIndex] : null;
+      shuffleArray(pairs);
+      // reassign labels A..D in new order and options accordingly
+      question.optionLabels = pairs.map((_, idx) => letterPool[idx]);
+      question.options = pairs.map(p => p.text);
+      // set new correct label by matching text
+      if (correctText !== null) {
+        const newIndex = question.options.findIndex(t => t === correctText);
+        if (newIndex >= 0) {
+          question.answer = question.optionLabels[newIndex];
+        }
+      }
+    }
+
+    function shuffleQuestionsAndOptions() {
+      // shuffle options within each question first
+      questions.forEach(q => shuffleOptions(q));
+      // then shuffle question order
+      shuffleArray(questions);
+    }
+
     // Initialize quiz
     async function initQuiz() {
       // Load topic from localStorage or fallback to topics.json
@@ -134,6 +172,12 @@
       if (questions.length === 0) {
         showError('Chuyên đề này chưa có câu hỏi!');
         return;
+      }
+
+      // Shuffle questions and answers if there is no saved progress
+      const hasSavedProgress = !!localStorage.getItem(`quiz_progress_${topicId}`);
+      if (!hasSavedProgress) {
+        shuffleQuestionsAndOptions();
       }
 
       // Initialize user answers
@@ -198,10 +242,11 @@
         const answerEl = document.createElement('div');
         const isSelected = userAnswer.answer === label;
         const isCorrect = label === question.answer;
+        const reveal = quizSubmitted || userAnswer.answer !== null;
         
         let answerClass = 'answer';
         if (isSelected) answerClass += ' selected';
-        if (quizSubmitted) {
+        if (reveal) {
           if (isCorrect) answerClass += ' correct';
           if (isSelected && !isCorrect) answerClass += ' incorrect';
         }
@@ -389,6 +434,8 @@
           // Clear quiz progress and reset state to the very beginning
           localStorage.removeItem(`quiz_progress_${topicId}`);
           quizSubmitted = false;
+          // Shuffle fresh for a new attempt
+          shuffleQuestionsAndOptions();
           userAnswers = questions.map(() => ({
             answer: null,
             correct: null,

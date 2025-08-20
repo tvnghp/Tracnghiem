@@ -118,13 +118,17 @@
         </div>
       </div>
       
-      <div class="mt-4">
+      <div class="mt-4 admin-actions">
         <button id="export-json-btn" class="btn">
           <i class="material-icons">file_download</i> Tải xuống topics.json
         </button>
-        <button id="import-json-btn" class="btn btn-outline" style="margin-left: 8px;">
+        <button id="import-json-btn" class="btn btn-outline">
           <i class="material-icons">file_upload</i> Cập nhật từ topics.json
         </button>
+        <button id="import-json-file-btn" class="btn btn-outline">
+          <i class="material-icons">upload_file</i> Tải từ file JSON
+        </button>
+        <input type="file" id="import-json-file" accept=".json,application/json" style="display:none;" />
       </div>
     </div>
   </div>
@@ -336,6 +340,9 @@
       document.getElementById('export-json-btn').addEventListener('click', exportTopicsJson);
       // Import topics from topics.json (overwrite local)
       document.getElementById('import-json-btn').addEventListener('click', importTopicsFromJson);
+      // Import topics from local JSON file
+      document.getElementById('import-json-file-btn').addEventListener('click', () => document.getElementById('import-json-file').click());
+      document.getElementById('import-json-file').addEventListener('change', importTopicsFromLocalFile);
     });
 
     // Your existing topic management functions here
@@ -412,9 +419,15 @@
           alert('File topics.json không đúng định dạng (phải là mảng).');
           return;
         }
-        if (!confirm('Thao tác này sẽ ghi đè toàn bộ chuyên đề hiện tại trên máy bạn bằng dữ liệu trong topics.json. Tiếp tục?')) {
+        if (data.length === 0) {
+          if (confirm('File topics.json hiện đang rỗng. Bạn có muốn xóa toàn bộ chuyên đề hiện có trên máy này không?')) {
+            saveTopics([]);
+            renderTopics();
+            alert('Đã xóa toàn bộ chuyên đề theo topics.json rỗng.');
+          }
           return;
         }
+        if (!confirm('Thao tác này sẽ ghi đè toàn bộ chuyên đề hiện tại trên máy bạn bằng dữ liệu trong topics.json. Tiếp tục?')) return;
         saveTopics(data);
         renderTopics();
         alert('Đã cập nhật chuyên đề từ topics.json thành công!');
@@ -422,6 +435,43 @@
         alert('Lỗi khi đọc topics.json. Vui lòng thử lại.');
         console.error(e);
       }
+    }
+
+    function importTopicsFromLocalFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (!Array.isArray(data)) {
+            alert('File JSON không đúng định dạng (phải là mảng).');
+            return;
+          }
+          if (data.length === 0) {
+            if (confirm('File JSON rỗng. Bạn có muốn xóa toàn bộ chuyên đề hiện có trên máy này không?')) {
+              saveTopics([]);
+              renderTopics();
+              alert('Đã xóa toàn bộ chuyên đề.');
+            }
+            return;
+          }
+          if (!confirm('Ghi đè toàn bộ chuyên đề hiện tại bằng dữ liệu trong file JSON này?')) return;
+          saveTopics(data);
+          renderTopics();
+          alert('Đã cập nhật chuyên đề từ file JSON thành công!');
+        } catch (err) {
+          console.error(err);
+          alert('Không đọc được file JSON. Vui lòng kiểm tra nội dung file.');
+        } finally {
+          // reset input so selecting the same file again will still trigger change
+          e.target.value = '';
+        }
+      };
+      reader.onerror = function() {
+        alert('Lỗi khi đọc file. Vui lòng thử lại.');
+      };
+      reader.readAsText(file, 'utf-8');
     }
   </script>
 </body>
