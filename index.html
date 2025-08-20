@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hệ thống ôn luyện trắc nghiệm</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <img src="logo.png" alt="Logo" id="logo-img">
+        <div class="logo-text">
+          <h1>Hệ thống ôn luyện trắc nghiệm</h1>
+          <p>Luyện tập và kiểm tra kiến thức</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="welcome-section">
+        <h2>Chào mừng đến với hệ thống ôn luyện trắc nghiệm</h2>
+        <p>Chọn chuyên đề bên dưới để bắt đầu làm bài:</p>
+      </div>
+
+      <div id="topics-container" class="topics-grid">
+        <!-- Topics will be loaded here -->
+      </div>
+
+      <div class="admin-section">
+        <a href="admin.html" class="btn btn-outline">
+          <i class="material-icons">admin_panel_settings</i> Quản trị viên
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const topicsContainer = document.getElementById('topics-container');
+      
+      function loadTopics() {
+        const topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+        
+        if (topics.length === 0) {
+          topicsContainer.innerHTML = `
+            <div class="empty-state">
+              <i class="material-icons">folder_open</i>
+              <p>Chưa có chuyên đề nào</p>
+              <a href="admin.html" class="btn">
+                <i class="material-icons">add_circle</i> Tạo chuyên đề mới
+              </a>
+            </div>`;
+          return;
+        }
+
+        topicsContainer.innerHTML = topics.map(topic => `
+          <div class="topic-card">
+            <div class="topic-card-content">
+              <h3>${topic.name}</h3>
+              <p>${topic.questions ? topic.questions.length : 0} câu hỏi</p>
+              <a href="quiz.html?topic=${encodeURIComponent(topic.id)}" class="btn">
+                <i class="material-icons">play_arrow</i> Bắt đầu
+              </a>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      loadTopics();
+    });
+  </script>
+</body>
+</html>
