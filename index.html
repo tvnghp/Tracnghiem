@@ -66,23 +66,29 @@
         `).join('');
       }
       
-      function loadTopics() {
+      async function loadTopics() {
         const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
         if (localTopics.length > 0) {
           renderTopics(localTopics);
           return;
         }
-        fetch('topics.json', { cache: 'no-store' })
-          .then(resp => resp.ok ? resp.json() : [])
-          .then(remoteTopics => {
+        try {
+          // Dùng đường dẫn tương đối + cache-busting để tránh CDN trả bản cũ
+          const url = new URL('./topics.json', location.href);
+          url.searchParams.set('v', Date.now());
+          const resp = await fetch(url, { cache: 'no-store' });
+          if (resp.ok) {
+            const remoteTopics = await resp.json();
             if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
               localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
               renderTopics(remoteTopics);
-            } else {
-              showEmptyState();
+              return;
             }
-          })
-          .catch(() => showEmptyState());
+          }
+          showEmptyState();
+        } catch(e) {
+          showEmptyState();
+        }
       }
       
       loadTopics();
