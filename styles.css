@@ -145,17 +145,22 @@ textarea:focus {
 }
 
 .question {
-  font-size: 1.2em;
-  font-weight: 500;
-  margin-bottom: 20px;
-  line-height: 1.5;
+  font-size: 1.25em !important;
+  font-weight: 500 !important;
+  color: #800020 !important;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;      /* Sát với câu hỏi */
+  gap: 0px !important;           /* Các đáp án cũng gần nhau hơn */
+  line-height: 1.5 !important;
 }
 
 .answers {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 30px;
+  margin-top: 0px !important;
+  gap: 0px !important;     /* Giảm khoảng cách giữa các đáp án */
+  margin-bottom: 8px !important;
 }
 
 .answer {
@@ -166,7 +171,10 @@ textarea:focus {
   transition: all 0.2s ease;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 0px !important;      /* Giảm khoảng cách giữa ký tự và nội dung đáp án */
+  padding: 10px 14px !important;
+  padding-left: 2px !important; /* giảm sát lề trái */
+
 }
 
 .answer:hover {
@@ -180,9 +188,15 @@ textarea:focus {
 }
 
 .answer .option {
-  font-weight: bold;
-  color: var(--primary-color);
-  min-width: 24px;
+  min-width: 24px !important;   /* nhỏ lại cho sát hơn */
+  margin-right: 0px !important; /* giữ khoảng cách với nội dung đáp án */
+  margin-left: 0 !important;
+  font-size: 1.15em !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
 }
 
 .answer .text {
@@ -270,16 +284,32 @@ textarea:focus {
 }
 
 .answer.correct {
-  background: #e8f5e9;
-  border-color: #4caf50;
+  background: #800020 !important;
+  color: #fff !important;
+  border: 2px solid #800020 !important;
 }
 
 .answer.incorrect {
-  background: #ffebee;
-  border-color: #f44336;
-  opacity: 0.8;
+  background: #f7e5ed !important;
+  color: #800020 !important;
+  border: 2px solid #f7e5ed;
+}
+.answer.correct .option {
+  background: #800020 !important;
+  color: #fff !important;
 }
 
+.answer.incorrect .option {
+  background: #f7e5ed !important;
+  color: #800020 !important;
+}
+.answer.correct::after {
+  color: #fff !important;
+}
+
+.answer.incorrect::after {
+  color: #800020 !important;
+}
 /* Flagged Questions */
 .flagged-questions-panel {
   display: none;
@@ -1571,3 +1601,50 @@ textarea:focus {
   border-color: var(--primary-dark);
   color: #fff;
 }
+#topic-name, .topic-title, h1 {
+  font-size: 1.25em;
+  font-weight: 400;
+  color: #800020;
+  margin-bottom: 18px;
+  text-align: left;
+}
+.btn-prev, .prev-btn {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border: 2px solid var(--primary-color) !important;
+  border-radius: var(--border-radius-md);
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-prev:hover, .prev-btn:hover {
+  background: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+.footer-copyright {
+  text-align: center;
+  color: #800020;
+  font-size: 0.98em;
+  margin: 40px 0 10px 0;
+  padding-top: 18px;
+  border-top: 1px solid #e0e0e0;
+  background: transparent;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  opacity: 0.85;
+  line-height: 1.6;
+  font-weight: 1000; /* chữ đậm hơn */
+
+}
+/* 
+----------------------------------------------------------
+Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II
+Tác giả: [Tên của bạn hoặc nhóm]
+Không được sử dụng lại hoặc sao chép khi chưa có sự đồng ý.
+----------------------------------------------------------
+*/

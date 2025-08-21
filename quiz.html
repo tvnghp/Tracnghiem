@@ -6,6 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  .modal {
+    position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .modal.hidden { display: none; }
+  .modal-content {
+    background: #fff; border-radius: 10px; padding: 32px 24px 24px 24px; box-shadow: 0 8px 32px rgba(128,0,32,0.13);
+    max-width: 340px; text-align: center;
+  }
+  .modal-content h3 { margin-top: 0; color: #800020; }
+  .modal-actions { margin-top: 22px; display: flex; gap: 16px; justify-content: center; }
+  .modal-actions .btn { min-width: 120px; }
+</style>
 </head>
 <body>
   <div class="container">
@@ -13,7 +28,7 @@
       <div class="logo">
         <img src="logo.png" alt="Logo" id="logo-img">
         <div class="logo-text">
-          <h1>HỆ THỐNG TRẮC NGHIỆM CHI NHÁNH CẦN THƠ II</h1>
+          <h1><b>HỆ THỐNG TRẮC NGHIỆM CHI NHÁNH CẦN THƠ II</b></h1>
           <p id="topic-name"></p>
         </div>
       </div>
@@ -21,8 +36,7 @@
         <div id="progress-bar"></div>
         <div id="question-counter">Câu 1/10</div>
       </div>
-    </header>
-
+    </header>    
     <div class="content">
       <div id="question-container">
         <div class="question-header">
@@ -40,9 +54,9 @@
       </div>
 
       <div class="quiz-controls">
-        <button id="prev-btn" class="btn btn-outline">
-          <i class="material-icons">navigate_before</i> Câu trước
-        </button>
+        <button id="prev-btn" class="btn btn-primary">
+  <i class="material-icons">navigate_before</i> Câu trước
+</button>
         <div class="quiz-actions">
           <button id="flag-btn" class="btn btn-flag">
             <i class="material-icons">bookmark_border</i> Đánh dấu
@@ -71,8 +85,18 @@
 
       <div id="result" class="result-panel"></div>
     </div>
+  
+<!-- Modal hỏi tiếp tục session -->
+  <div id="session-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Tiếp tục bài kiểm tra?</h3>
+        <p>Bạn đã có một phiên làm bài trước đó.<br>Bạn muốn tiếp tục hay bắt đầu phiên mới?</p>
+        <div class="modal-actions">
+          <button id="resume-btn" class="btn btn-primary">Tiếp tục phiên cũ</button>
+          <button id="new-session-btn" class="btn btn-outline">Bắt đầu mới</button>
+        </div>
+    </div>
   </div>
-
   <script>
     // DOM Elements
     const questionEl = document.getElementById('question');
@@ -140,66 +164,88 @@
 
     // Initialize quiz
     async function initQuiz() {
-      // Load topic from localStorage or fallback to topics.json
-      topicId = getTopicId();
-      topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
-      topic = topics.find(t => t.id === topicId);
-      
-      if (!topic) {
-        try {
-          // CHỈNH: dùng đường dẫn tương đối + cache-busting
-          const url = new URL('./topics.json', location.href);
-          url.searchParams.set('v', Date.now());
-          const resp = await fetch(url, { cache: 'no-store' });
-          if (resp.ok) {
-            const remoteTopics = await resp.json();
-            if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
-              localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
-              topics = remoteTopics;
-              topic = topics.find(t => t.id === topicId);
-            }
-          }
-        } catch (e) {
-          // ignore fetch errors and fall through to error display
+  topicId = getTopicId();
+  const progressKey = `quiz_progress_${topicId}`;
+  const oldSession = localStorage.getItem(progressKey);
+
+  if (oldSession) {
+    // Hiển thị modal hỏi người dùng
+    const modal = document.getElementById('session-modal');
+    modal.classList.remove('hidden');
+    return new Promise(resolve => {
+      document.getElementById('resume-btn').onclick = () => {
+        modal.classList.add('hidden');
+        resolve();
+      };
+      document.getElementById('new-session-btn').onclick = () => {
+        localStorage.removeItem(progressKey);
+        modal.classList.add('hidden');
+        resolve();
+      };
+    }).then(() => continueInitQuiz());
+  } else {
+    continueInitQuiz();
+  }
+}
+
+async function continueInitQuiz() {
+  topics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+  topic = topics.find(t => t.id === topicId);
+
+  if (!topic) {
+    try {
+      const url = new URL('./topics.json', location.href);
+      url.searchParams.set('v', Date.now());
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (resp.ok) {
+        const remoteTopics = await resp.json();
+        if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
+          localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
+          topics = remoteTopics;
+          topic = topics.find(t => t.id === topicId);
         }
       }
-      
-      if (!topic) {
-        showError('Không tìm thấy chuyên đề!');
-        return;
-      }
-
-      document.getElementById('topic-name').textContent = topic.name;
-      questions = topic.questions || [];
-      
-      if (questions.length === 0) {
-        showError('Chuyên đề này chưa có câu hỏi!');
-        return;
-      }
-
-      // Shuffle questions and answers if there is no saved progress
-      const hasSavedProgress = !!localStorage.getItem(`quiz_progress_${topicId}`);
-      if (!hasSavedProgress) {
-        shuffleQuestionsAndOptions();
-      }
-
-      // Initialize user answers
-      userAnswers = questions.map((q, index) => ({
-        answer: null,
-        correct: null,
-        flagged: false,
-        explanationShown: false
-      }));
-
-      // Load saved progress if exists
-      loadProgress();
-      
-      // Initialize event listeners
-      initEventListeners();
-      
-      // Show first question
-      showQuestion(currentQuestionIndex);
+    } catch (e) {
+      // ignore fetch errors and fall through to error display
     }
+  }
+
+  if (!topic) {
+    showError('Không tìm thấy chuyên đề!');
+    return;
+  }
+
+  document.getElementById('topic-name').textContent = topic.name;
+  questions = topic.questions || [];
+
+  if (questions.length === 0) {
+    showError('Chuyên đề này chưa có câu hỏi!');
+    return;
+  }
+
+  // Shuffle questions and answers nếu không có saved progress
+  const hasSavedProgress = !!localStorage.getItem(`quiz_progress_${topicId}`);
+  if (!hasSavedProgress) {
+    shuffleQuestionsAndOptions();
+  }
+
+  // Initialize user answers
+  userAnswers = questions.map((q, index) => ({
+    answer: null,
+    correct: null,
+    flagged: false,
+    explanationShown: false
+  }));
+
+  // Load saved progress nếu có
+  loadProgress();
+
+  // Initialize event listeners
+  initEventListeners();
+
+  // Show first question
+  showQuestion(currentQuestionIndex);
+}
 
     function loadProgress() {
       const savedProgress = localStorage.getItem(`quiz_progress_${topicId}`);
@@ -543,5 +589,9 @@
     // Initialize the quiz
     document.addEventListener('DOMContentLoaded', initQuiz);
   </script>
+  <footer class="footer-copyright">
+  Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Agribank Chi nhánh Cần Thơ II.<br>  
+Liên hệ: Nguyễn Thành Trung 📱 Cellphone: 0947.86.86.82<br>📧 Email: trungnguyenthanh1@agribank.com.vn
+</footer>
 </body>
 </html>

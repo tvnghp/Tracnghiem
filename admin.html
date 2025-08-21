@@ -409,7 +409,7 @@
 
     async function importTopicsFromJson() {
       try {
-        const resp = await fetch('topics.json', { cache: 'no-store' });
+        const resp = await fetch('./topics.json', { cache: 'no-store' });
         if (!resp.ok) {
           alert('Không tải được topics.json từ máy chủ!');
           return;
@@ -474,5 +474,13 @@
       reader.readAsText(file, 'utf-8');
     }
   </script>
+  <footer class="footer-copyright">
+  Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.<br>  
+Liên hệ:
+Nguyễn Thành Trung
+📱 Cellphone: 0947.86.86.82
+📧 Email: trungnguyenthanh1@agribank.com.vn
+
+</footer>
 </body>
 </html>
