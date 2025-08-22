@@ -123,6 +123,23 @@
     let currentQuestionIndex = 0;
     let userAnswers = [];
     let quizSubmitted = false;
+function scrollToQuestion() {
+  // Ưu tiên phần tử đang hiển thị nội dung câu hỏi
+  const el = document.getElementById('question') 
+          || document.querySelector('.question-text') 
+          || document.getElementById('question-container');
+
+  if (!el) return;
+
+  // Cho phép focus tạm để .focus() không lỗi trên một số trình duyệt
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+
+  // Cuộn mượt lên vùng câu hỏi và đặt focus (không cuộn lần 2)
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+  });
+}
 
     // Shuffle helpers
     function shuffleArray(array) {
@@ -326,6 +343,11 @@ async function continueInitQuiz() {
       // Update navigation
       updateNavigation();
       updateProgress();
+// ... cuối showQuestion(index):
+scrollToQuestion();
+updateNextBtnStatus();
+
+
     }
 
     function updateFlagButton() {
@@ -379,6 +401,24 @@ async function continueInitQuiz() {
       // Update UI
       showQuestion(currentQuestionIndex);
       saveProgress();
+updateNextBtnStatus();
+
+requestAnimationFrame(() => {
+  const btn = document.getElementById('next-btn') || (typeof nextBtn !== 'undefined' ? nextBtn : null);
+  if (!btn) return;
+
+  // Cho phép focus tạm thời để .focus() không lỗi
+  if (!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex', '-1');
+
+  // Cuộn nút vào giữa màn hình
+  btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Đặt focus (không gây cuộn lại) và nháy nhẹ
+  btn.focus({ preventScroll: true });
+  btn.classList.add('pulse');
+  setTimeout(() => btn.classList.remove('pulse'), 600);
+});
+
     }
 
     function showExplanation(text) {
@@ -451,6 +491,20 @@ async function continueInitQuiz() {
         saveProgress();
       }
     }
+function getAnswerStatus(index){
+  const ua = userAnswers?.[index];
+  if (!ua || ua.answer == null) return { text: "Chưa chọn", cls: "status-pending" };
+  return ua.correct ? { text: "ĐÃ CHỌN: ĐÚNG", cls: "status-correct" }
+                    : { text: "ĐÃ CHỌN: SAI",  cls: "status-incorrect" };
+}
+
+function updateNextBtnStatus(){
+  const el = document.getElementById('next-btn') || (typeof nextBtn !== 'undefined' ? nextBtn : null);
+  if (!el) return;
+  const st = getAnswerStatus(currentQuestionIndex);
+  const base = `Câu tiếp <i class="material-icons">navigate_next</i>`;
+  el.innerHTML = `${base} <span class="status-badge ${st.cls}">${st.text}</span>`;
+}
 
     function showResults() {
       const correctCount = userAnswers.filter(a => a.correct).length;
