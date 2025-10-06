@@ -13,10 +13,6 @@
       <div class="logo">
         <img src="logo.png" alt="Logo" id="logo-img">
         <div class="logo-text">
-          <h1>Hệ thống ôn luyện trắc nghiệm Chi nhánh Cần Thơ II</h1>
-          <p>Luyện tập và kiểm tra kiến thức</p>
-        </div>
-      </div>
     </header>
 
     <div class="content">
@@ -33,16 +29,23 @@
         <a href="admin.html" class="btn btn-outline">
           <i class="material-icons">admin_panel_settings</i> Quản trị viên
         </a>
+        <button id="clear-cookies-btn" type="button" class="btn btn-outline" style="margin-left:8px">
+          <i class="material-icons">delete</i> Xóa cookie
+        </button>
+        <button id="clear-storage-btn" type="button" class="btn btn-outline" style="margin-left:8px">
+          <i class="material-icons">delete_sweep</i> Xóa bộ nhớ (local/session)
+        </button>
       </div>
     </div>
-  </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const topicsContainer = document.getElementById('topics-container');
-      
-      function showEmptyState() {
-        topicsContainer.innerHTML = `
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const topicsContainer = document.getElementById('topics-container');
+        const clearCookiesBtn = document.getElementById('clear-cookies-btn');
+        const clearStorageBtn = document.getElementById('clear-storage-btn');
+
+        function showEmptyState() {
+          topicsContainer.innerHTML = `
             <div class="empty-state">
               <i class="material-icons">folder_open</i>
               <p>Chưa có chuyên đề nào</p>
@@ -50,58 +53,103 @@
                 <i class="material-icons">add_circle</i> Tạo chuyên đề mới
               </a>
             </div>`;
-      }
-      
-      function renderTopics(topics) {
-        topicsContainer.innerHTML = topics.map(topic => `
-          <div class="topic-card">
-            <div class="topic-card-content">
-              <h3>${topic.name}</h3>
-              <p>${topic.questions ? topic.questions.length : 0} câu hỏi</p>
-              <a href="quiz.html?topic=${encodeURIComponent(topic.id)}" class="btn">
-                <i class="material-icons">play_arrow</i> Bắt đầu
-              </a>
-            </div>
-          </div>
-        `).join('');
-      }
-      
-      async function loadTopics() {
-        const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
-        if (localTopics.length > 0) {
-          renderTopics(localTopics);
-          return;
         }
-        try {
-          // Dùng đường dẫn tương đối + cache-busting để tránh CDN trả bản cũ
-          const url = new URL('./topics.json', location.href);
-          url.searchParams.set('v', Date.now());
-          const resp = await fetch(url, { cache: 'no-store' });
-          if (resp.ok) {
-            const remoteTopics = await resp.json();
-            if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
-              localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
-              renderTopics(remoteTopics);
-              return;
+
+        function clearAllCookies() {
+          try {
+            const cookies = document.cookie ? document.cookie.split(';') : [];
+            const past = 'Thu, 01 Jan 1970 00:00:00 GMT';
+            const hostnameParts = location.hostname ? location.hostname.split('.') : [];
+            const domains = [''];
+            for (let i = 0; i < hostnameParts.length; i++) {
+              const d = '.' + hostnameParts.slice(i).join('.');
+              if (d !== '.') domains.push(d);
             }
+            const paths = Array.from(new Set(['/','/' + location.pathname.split('/').filter(Boolean).join('/')]))
+                              .filter(Boolean);
+
+            for (const c of cookies) {
+              const eqPos = c.indexOf('=');
+              const name = (eqPos > -1 ? c.substr(0, eqPos) : c).trim();
+              for (const domain of domains) {
+                for (const p of paths) {
+                  document.cookie = `${name}=; expires=${past}; path=${p};${domain ? ` domain=${domain};` : ''} SameSite=Lax`;
+                }
+              }
+            }
+            alert('Đã xóa tất cả cookie của trang.');
+          } catch (e) {
+            alert('Không thể xóa cookie: ' + (e && e.message ? e.message : e));
           }
-          showEmptyState();
-        } catch(e) {
-          showEmptyState();
         }
-      }
-      
-      loadTopics();
-    });
-  </script>
-  <footer class="footer-copyright">
-  Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.<br>  
-Liên hệ:
-Nguyễn Thành Trung
-📱 Cellphone: 0947.86.86.82
-📧 Email: trungnguyenthanh1@agribank.com.vn
-</footer>
-</body>
+
+        function clearWebStorage() {
+          try {
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('Đã xóa localStorage và sessionStorage.');
+          } catch (e) {
+            alert('Không thể xóa web storage: ' + (e && e.message ? e.message : e));
+          }
+        }
+
+        if (clearCookiesBtn) {
+          clearCookiesBtn.addEventListener('click', clearAllCookies);
+        }
+
+        if (clearStorageBtn) {
+          clearStorageBtn.addEventListener('click', clearWebStorage);
+        }
+
+        function renderTopics(topics) {
+          topicsContainer.innerHTML = topics.map(topic => `
+            <div class="topic-card">
+              <div class="topic-card-content">
+                <h3>${topic.name}</h3>
+                <p>${topic.questions ? topic.questions.length : 0} câu hỏi</p>
+                <a href="quiz.html?topic=${encodeURIComponent(topic.id)}" class="btn">
+                  <i class="material-icons">play_arrow</i> Bắt đầu
+                </a>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        async function loadTopics() {
+          const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+          if (localTopics.length > 0) {
+            renderTopics(localTopics);
+            return;
+          }
+          try {
+            // Dùng đường dẫn tương đối + cache-busting để tránh CDN trả bản cũ
+            const url = new URL('./topics.json', location.href);
+            url.searchParams.set('v', Date.now());
+            const resp = await fetch(url, { cache: 'no-store' });
+            if (resp.ok) {
+              const remoteTopics = await resp.json();
+              if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
+                localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
+                renderTopics(remoteTopics);
+                return;
+              }
+            }
+            showEmptyState();
+          } catch(e) {
+            showEmptyState();
+          }
+        }
+
+        loadTopics();
+      });
+    </script>
+
+    <footer class="footer-copyright">
+      Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.<br>  
+      Liên hệ:
+      Nguyễn Thành Trung
+      📱 Cellphone: 0947.86.86.82
+      📧 Email: trungnguyenthanh1@agribank.com.vn
+    </footer>
+  </body>
 </html>
-
-
