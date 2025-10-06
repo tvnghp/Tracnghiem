@@ -18,12 +18,18 @@
     <div class="content">
       <div class="welcome-section">
         <h2>Chào mừng đến với hệ thống ôn luyện trắc nghiệm Cần Thơ II</h2>
-        <p>Chọn chuyên đề bên dưới để bắt đầu làm bài:</p>
+        <p>Chọn chuyên mục phù hợp bên dưới:</p>
       </div>
 
-      <div id="topics-container" class="topics-grid">
-        <!-- Topics will be loaded here -->
-      </div>
+      <section class="mt-4">
+        <h3>Chuyên đề (không giới hạn thời gian)</h3>
+        <div id="topics-container" class="topics-grid"></div>
+      </section>
+
+      <section class="mt-4">
+        <h3>Bài thi (có thời gian)</h3>
+        <div id="exams-container" class="topics-grid"></div>
+      </section>
 
       <div class="admin-section">
         <a href="admin.html" class="btn btn-outline">
@@ -41,6 +47,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const topicsContainer = document.getElementById('topics-container');
+        const examsContainer = document.getElementById('exams-container');
         const clearCookiesBtn = document.getElementById('clear-cookies-btn');
         const clearStorageBtn = document.getElementById('clear-storage-btn');
 
@@ -49,10 +56,16 @@
             <div class="empty-state">
               <i class="material-icons">folder_open</i>
               <p>Chưa có chuyên đề nào</p>
-              <a href="admin.html" class="btn">
-                <i class="material-icons">add_circle</i> Tạo chuyên đề mới
-              </a>
+              <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
             </div>`;
+          if (examsContainer) {
+            examsContainer.innerHTML = `
+              <div class="empty-state">
+                <i class="material-icons">assignment</i>
+                <p>Chưa có bài thi nào</p>
+                <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
+              </div>`;
+          }
         }
 
         function clearAllCookies() {
@@ -101,8 +114,11 @@
           clearStorageBtn.addEventListener('click', clearWebStorage);
         }
 
-        function renderTopics(topics) {
-          topicsContainer.innerHTML = topics.map(topic => `
+        function renderLists(all) {
+          const exams = all.filter(t => t && (t.isExam === true || (typeof t.durationMinutes === 'number' && t.durationMinutes > 0)));
+          const topics = all.filter(t => !(t && (t.isExam === true || (typeof t.durationMinutes === 'number' && t.durationMinutes > 0))));
+
+          topicsContainer.innerHTML = topics.length ? topics.map(topic => `
             <div class="topic-card">
               <div class="topic-card-content">
                 <h3>${topic.name}</h3>
@@ -112,13 +128,37 @@
                 </a>
               </div>
             </div>
-          `).join('');
+          `).join('') : `
+            <div class="empty-state">
+              <i class="material-icons">folder_open</i>
+              <p>Chưa có chuyên đề nào</p>
+              <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
+            </div>`;
+
+          if (examsContainer) {
+            examsContainer.innerHTML = exams.length ? exams.map(exam => `
+              <div class="topic-card">
+                <div class="topic-card-content">
+                  <h3>${exam.name}</h3>
+                  <p>${exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0)} câu • ${exam.durationMinutes ? (exam.durationMinutes + ' phút') : 'Không rõ thời gian'}</p>
+                  <a href="quiz.html?topic=${encodeURIComponent(exam.id)}" class="btn">
+                    <i class="material-icons">play_arrow</i> Bắt đầu
+                  </a>
+                </div>
+              </div>
+            `).join('') : `
+              <div class="empty-state">
+                <i class="material-icons">assignment</i>
+                <p>Chưa có bài thi nào</p>
+                <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
+              </div>`;
+          }
         }
 
         async function loadTopics() {
           const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
           if (localTopics.length > 0) {
-            renderTopics(localTopics);
+            renderLists(localTopics);
             return;
           }
           try {
@@ -130,7 +170,7 @@
               const remoteTopics = await resp.json();
               if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
                 localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
-                renderTopics(remoteTopics);
+                renderLists(remoteTopics);
                 return;
               }
             }

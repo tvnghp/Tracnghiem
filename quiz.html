@@ -34,7 +34,15 @@
       </div>
       <div class="quiz-progress">
         <div id="progress-bar"></div>
+      </div>
+      <div class="quiz-meta" style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
         <div id="question-counter">Câu 1/10</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div id="timer" class="timer" style="font-weight:600; color:#800020"></div>
+          <button id="pause-btn" class="btn-icon" style="display:none" title="Tạm dừng/tiếp tục">
+            <i class="material-icons">pause</i>
+          </button>
+        </div>
       </div>
     </header>    
     <div class="content">
@@ -42,7 +50,6 @@
         <div class="question-header">
           <div id="question" class="question"></div>
           <div class="question-meta">
-            <span id="question-number">Câu 1/10</span>
             <button id="show-flagged-btn" class="btn btn-outline" title="Xem các câu đã đánh dấu">
               <i class="material-icons">bookmark</i>
               <span id="flag-count">0</span>
@@ -102,7 +109,7 @@
     const questionEl = document.getElementById('question');
     const answersEl = document.getElementById('answers');
     const progressEl = document.getElementById('progress-bar');
-    const questionNumberEl = document.getElementById('question-number');
+    const questionCounterEl = document.getElementById('question-counter');
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const submitBtn = document.getElementById('submit-quiz-btn');
@@ -114,6 +121,8 @@
     const flaggedQuestionsEl = document.getElementById('flagged-questions');
     const explanationEl = document.getElementById('explanation');
     const resultArea = document.getElementById('result');
+    const timerEl = document.getElementById('timer');
+    const pauseBtn = document.getElementById('pause-btn');
 
     // Quiz state
     let topicId = null;
@@ -123,6 +132,9 @@
     let currentQuestionIndex = 0;
     let userAnswers = [];
     let quizSubmitted = false;
+    let timerInterval = null;
+    let endTimeMs = null;
+    let isPaused = false;
 function scrollToQuestion() {
   // Ưu tiên phần tử đang hiển thị nội dung câu hỏi
   const el = document.getElementById('question') 
@@ -186,7 +198,7 @@ function scrollToQuestion() {
   const oldSession = localStorage.getItem(progressKey);
 
   if (oldSession) {
-    // Hiển thị modal hỏi người dùng
+    // Hiển thị modal hỏi người dùng (cho cả chuyên đề và bài thi)
     const modal = document.getElementById('session-modal');
     modal.classList.remove('hidden');
     return new Promise(resolve => {
@@ -196,6 +208,10 @@ function scrollToQuestion() {
       };
       document.getElementById('new-session-btn').onclick = () => {
         localStorage.removeItem(progressKey);
+        // reset timer key as well when starting new session
+        localStorage.removeItem(`quiz_timer_end_${topicId}`);
+        // clear cached exam question set to force a fresh randomization
+        localStorage.removeItem(`quiz_exam_questions_${topicId}`);
         modal.classList.add('hidden');
         resolve();
       };
@@ -233,7 +249,12 @@ async function continueInitQuiz() {
   }
 
   document.getElementById('topic-name').textContent = topic.name;
-  questions = topic.questions || [];
+  // For exams, assemble questions per attempt using current topics based on examConfig
+  if (topic.isExam === true && topic.examConfig && Array.isArray(topic.examConfig.distribution)) {
+    questions = getOrCreateExamSessionQuestions(topic);
+  } else {
+    questions = topic.questions || [];
+  }
 
   if (questions.length === 0) {
     showError('Chuyên đề này chưa có câu hỏi!');
@@ -262,6 +283,37 @@ async function continueInitQuiz() {
 
   // Show first question
   showQuestion(currentQuestionIndex);
+
+  // Initialize countdown timer (use topic duration or ask user)
+  const effectiveMinutes = getEffectiveDurationMinutes();
+  if (effectiveMinutes > 0) {
+    startOrResumeTimer(effectiveMinutes);
+  } else if (timerEl) {
+    timerEl.style.display = 'none';
+  }
+
+  // Setup Pause/Resume if allowed
+  if (pauseBtn) {
+    if (topic.allowPause) {
+      pauseBtn.style.display = 'inline-flex';
+      pauseBtn.addEventListener('click', togglePauseResume);
+      // restore paused state if any
+      const pausedKey = `quiz_timer_paused_${topicId}`;
+      const remainingKey = `quiz_timer_remaining_${topicId}`;
+      const pausedSaved = localStorage.getItem(pausedKey) === 'true';
+      if (pausedSaved) {
+        isPaused = true;
+        const remain = parseInt(localStorage.getItem(remainingKey) || '0', 10);
+        if (remain > 0) {
+          endTimeMs = Date.now() + remain; // keep a reference
+          updateTimerDisplay(remain);
+        }
+        setPausedUI(true);
+      }
+    } else {
+      pauseBtn.style.display = 'none';
+    }
+  }
 }
 
     function loadProgress() {
@@ -288,6 +340,202 @@ async function continueInitQuiz() {
       localStorage.setItem(`quiz_progress_${topicId}`, JSON.stringify(progress));
     }
 
+    // ===== Exam assembly per attempt =====
+    function getOrCreateExamSessionQuestions(examTopic) {
+      const cacheKey = `quiz_exam_questions_${examTopic.id}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (_) {}
+      }
+      const built = buildExamQuestions(examTopic);
+      if (Array.isArray(built) && built.length > 0) {
+        localStorage.setItem(cacheKey, JSON.stringify(built));
+      }
+      return built;
+    }
+
+    function buildExamQuestions(examTopic) {
+      const allTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
+      const dist = examTopic.examConfig?.distribution || [];
+      const total = parseInt(examTopic.examConfig?.total || 0, 10);
+      if (!Array.isArray(dist) || !Number.isFinite(total) || total <= 0) {
+        return examTopic.questions || [];
+      }
+
+      // Calculate allocation similar to admin builder
+      const withCalc = dist.map(d => ({ id: d.id, percent: d.percent, exact: (total * d.percent) / 100 }));
+      let allocated = withCalc.map(x => ({ id: x.id, count: Math.floor(x.exact), frac: x.exact - Math.floor(x.exact) }));
+      let assigned = allocated.reduce((s, a) => s + a.count, 0);
+      let remain = total - assigned;
+      if (remain > 0) {
+        allocated.sort((a, b) => b.frac - a.frac);
+        for (let i = 0; i < allocated.length && remain > 0; i++) { allocated[i].count += 1; remain--; }
+      }
+
+      // Sample per topic
+      const combined = [];
+      for (const a of allocated) {
+        const t = allTopics.find(t => t.id === a.id);
+        if (!t || !Array.isArray(t.questions)) {
+          // Missing topic; fallback to existing exam questions
+          return examTopic.questions || [];
+        }
+        if (a.count > t.questions.length) {
+          // Not enough questions; fallback
+          return examTopic.questions || [];
+        }
+        const copy = t.questions.slice();
+        // shuffle
+        for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
+        combined.push(...copy.slice(0, a.count));
+      }
+      // final shuffle
+      for (let i = combined.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [combined[i], combined[j]] = [combined[j], combined[i]]; }
+      return combined;
+    }
+
+    // Determine duration: Only exams have/ask for duration.
+    // Prefer topic.durationMinutes; if missing and this IS an exam, ask once and cache.
+    function getEffectiveDurationMinutes() {
+      if (typeof topic.durationMinutes === 'number' && topic.durationMinutes > 0) {
+        return topic.durationMinutes;
+      }
+      // If not an exam, do not ask for time; no timer for normal topics.
+      if (topic.isExam !== true) return 0;
+      try {
+        const key = `quiz_custom_duration_${topicId}`;
+        const saved = localStorage.getItem(key);
+        let minutes = saved ? parseInt(saved, 10) : NaN;
+        if (!Number.isFinite(minutes) || minutes <= 0) {
+          const input = prompt('Nhập thời gian làm bài (phút):', '30');
+          if (input === null) return 0; // user canceled
+          minutes = parseInt(input, 10);
+          if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+          localStorage.setItem(key, String(minutes));
+        }
+        return minutes;
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    // ===== Timer Logic =====
+    function formatTime(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      const pad = (n) => n.toString().padStart(2,'0');
+      return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    }
+
+    function updateTimerDisplay(remainMs){
+      if (!timerEl) return;
+      timerEl.textContent = formatTime(remainMs);
+      timerEl.classList.remove('warning','danger');
+      if (remainMs <= 60 * 1000) {
+        timerEl.classList.add('danger');
+      } else if (remainMs <= 120 * 1000) {
+        timerEl.classList.add('warning');
+      }
+    }
+
+    function updateTimer() {
+      if (!endTimeMs || !timerEl) return;
+      const remain = endTimeMs - Date.now();
+      updateTimerDisplay(remain);
+      if (remain <= 0) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        if (!quizSubmitted) {
+          alert('Hết thời gian. Bài sẽ được nộp tự động.');
+          submitQuiz();
+        }
+      }
+    }
+
+    function startOrResumeTimer(durationMinutes) {
+      const key = `quiz_timer_end_${topicId}`;
+      const pausedKey = `quiz_timer_paused_${topicId}`;
+      const remainingKey = `quiz_timer_remaining_${topicId}`;
+      const saved = localStorage.getItem(key);
+      const pausedSaved = localStorage.getItem(pausedKey) === 'true';
+      if (saved) {
+        endTimeMs = parseInt(saved, 10);
+      } else {
+        endTimeMs = Date.now() + durationMinutes * 60 * 1000;
+        localStorage.setItem(key, String(endTimeMs));
+      }
+      if (timerEl) timerEl.style.display = 'block';
+      if (pausedSaved) {
+        // display remaining time without ticking
+        isPaused = true;
+        const remain = parseInt(localStorage.getItem(remainingKey) || '0', 10);
+        updateTimerDisplay(remain > 0 ? remain : (endTimeMs - Date.now()));
+        setPausedUI(true);
+      } else {
+        updateTimer();
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
+      }
+    }
+
+    function togglePauseResume(){
+      if (isPaused) {
+        resumeTimer();
+      } else {
+        pauseTimer();
+      }
+    }
+
+    function pauseTimer(){
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      const remain = Math.max(0, endTimeMs - Date.now());
+      localStorage.setItem(`quiz_timer_paused_${topicId}`, 'true');
+      localStorage.setItem(`quiz_timer_remaining_${topicId}`, String(remain));
+      isPaused = true;
+      setPausedUI(true);
+      updateTimerDisplay(remain);
+    }
+
+    function resumeTimer(){
+      const remainingKey = `quiz_timer_remaining_${topicId}`;
+      const endKey = `quiz_timer_end_${topicId}`;
+      const pausedKey = `quiz_timer_paused_${topicId}`;
+      const remain = parseInt(localStorage.getItem(remainingKey) || '0', 10);
+      const base = isNaN(remain) || remain <= 0 ? (endTimeMs - Date.now()) : remain;
+      endTimeMs = Date.now() + Math.max(0, base);
+      localStorage.setItem(endKey, String(endTimeMs));
+      localStorage.removeItem(remainingKey);
+      localStorage.setItem(pausedKey, 'false');
+      isPaused = false;
+      setPausedUI(false);
+      updateTimer();
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function setPausedUI(paused){
+      if (!pauseBtn) return;
+      if (paused) {
+        pauseBtn.innerHTML = '<i class="material-icons">play_arrow</i>';
+        pauseBtn.title = 'Tiếp tục';
+        // disable interactions while paused
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        submitBtn.disabled = true;
+      } else {
+        pauseBtn.innerHTML = '<i class="material-icons">pause</i>';
+        pauseBtn.title = 'Tạm dừng';
+        prevBtn.disabled = currentQuestionIndex === 0;
+        nextBtn.disabled = currentQuestionIndex === questions.length - 1;
+        submitBtn.disabled = false;
+      }
+    }
+
     function showQuestion(index) {
       if (index < 0 || index >= questions.length) return;
       
@@ -295,8 +543,10 @@ async function continueInitQuiz() {
       const question = questions[index];
       const userAnswer = userAnswers[index];
       
-      // Update question number display
-      questionNumberEl.textContent = `Câu ${index + 1}/${questions.length}`;
+      // Update question number display (single source)
+      if (questionCounterEl) {
+        questionCounterEl.textContent = `Câu ${index + 1}/${questions.length}`;
+      }
       
       // Update question text
       questionEl.textContent = question.question;
@@ -385,7 +635,7 @@ updateNextBtnStatus();
     }
 
     function selectAnswer(answer) {
-      if (quizSubmitted) return;
+      if (quizSubmitted || isPaused) return;
       
       const userAnswer = userAnswers[currentQuestionIndex];
       userAnswer.answer = answer;
@@ -430,12 +680,14 @@ requestAnimationFrame(() => {
     }
 
     function toggleFlag() {
+      if (isPaused) return;
       userAnswers[currentQuestionIndex].flagged = !userAnswers[currentQuestionIndex].flagged;
       updateFlagButton();
       saveProgress();
     }
 
     function showFlaggedQuestions() {
+      if (isPaused) return;
       const flaggedIndices = [];
       userAnswers.forEach((ua, index) => {
         if (ua.flagged) flaggedIndices.push(index);
@@ -489,6 +741,10 @@ requestAnimationFrame(() => {
         quizSubmitted = true;
         showResults();
         saveProgress();
+        // clear timer keys
+        localStorage.removeItem(`quiz_timer_end_${topicId}`);
+        localStorage.removeItem(`quiz_timer_paused_${topicId}`);
+        localStorage.removeItem(`quiz_timer_remaining_${topicId}`);
       }
     }
 function getAnswerStatus(index){
@@ -536,8 +792,16 @@ function updateNextBtnStatus(){
         restartBtn.addEventListener('click', () => {
           // Clear quiz progress and reset state to the very beginning
           localStorage.removeItem(`quiz_progress_${topicId}`);
+          // Reset timer end and start fresh if timed
+          localStorage.removeItem(`quiz_timer_end_${topicId}`);
+          // For exams: clear cached selection so a new random set is built
+          localStorage.removeItem(`quiz_exam_questions_${topicId}`);
           quizSubmitted = false;
-          // Shuffle fresh for a new attempt
+          // Rebuild questions for exams; otherwise reuse topic.questions
+          if (topic.isExam === true && topic.examConfig && Array.isArray(topic.examConfig.distribution)) {
+            questions = getOrCreateExamSessionQuestions(topic);
+          }
+          // Shuffle order and options for a new attempt
           shuffleQuestionsAndOptions();
           userAnswers = questions.map(() => ({
             answer: null,
@@ -550,6 +814,10 @@ function updateNextBtnStatus(){
           resultArea.style.display = 'none';
           showQuestion(0);
           saveProgress();
+          const ef = getEffectiveDurationMinutes();
+          if (ef > 0) {
+            startOrResumeTimer(ef);
+          }
         }, { once: true });
       }
       
@@ -567,12 +835,14 @@ function updateNextBtnStatus(){
     function initEventListeners() {
       // Navigation
       prevBtn.addEventListener('click', () => {
+        if (isPaused) return;
         if (currentQuestionIndex > 0) {
           showQuestion(currentQuestionIndex - 1);
         }
       });
 
       nextBtn.addEventListener('click', () => {
+        if (isPaused) return;
         if (currentQuestionIndex < questions.length - 1) {
           showQuestion(currentQuestionIndex + 1);
         }
@@ -603,6 +873,7 @@ function updateNextBtnStatus(){
       
       // Keyboard navigation
       document.addEventListener('keydown', (e) => {
+        if (isPaused) return;
         if (e.key === 'ArrowLeft' && currentQuestionIndex > 0) {
           showQuestion(currentQuestionIndex - 1);
         } else if (e.key === 'ArrowRight' && currentQuestionIndex < questions.length - 1) {

@@ -1662,12 +1662,17 @@ textarea:focus {
 .status-incorrect{ background:#ffebee; color:#c62828; border-color:#ef9a9a; }   /* Sai */
 
 /* Badge nằm gọn phía sau chữ trên nút */
-#next-btn .status-badge { margin-left:8px; }
+  #next-btn .status-badge { margin-left:8px; }
 
-/* 
-----------------------------------------------------------
-Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II
-Tác giả: [Tên của bạn hoặc nhóm]
-Không được sử dụng lại hoặc sao chép khi chưa có sự đồng ý.
-----------------------------------------------------------
-*/
+  /* 
+  ----------------------------------------------------------
+  Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II
+  Tác giả: [Tên của bạn hoặc nhóm]
+  Không được sử dụng lại hoặc sao chép khi chưa có sự đồng ý.
+  ------------------------------------------------
+  */
+/* Timer styles */
+.timer { font-variant-numeric: tabular-nums; }
+.timer.warning { color: #e67e22 !important; }
+.timer.danger  { color: #e53935 !important; animation: timerPulse 1s ease-in-out infinite; }
+@keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
