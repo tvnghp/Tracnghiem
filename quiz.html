@@ -5,7 +5,12 @@
   <title>Bài kiểm tra trắc nghiệm Chi nhánh Cần Thơ II</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mobile-enhancements.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <meta name="theme-color" content="#800020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Quiz Cần Thơ II">
 <style>
   .modal {
     position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
@@ -20,6 +25,53 @@
   .modal-content h3 { margin-top: 0; color: #800020; }
   .modal-actions { margin-top: 22px; display: flex; gap: 16px; justify-content: center; }
   .modal-actions .btn { min-width: 120px; }
+  
+  /* Mobile-specific quiz enhancements */
+  @media (max-width: 768px) {
+    .modal-content {
+      max-width: 95vw;
+      margin: 20px;
+      padding: 24px 20px;
+    }
+    
+    .modal-actions {
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .modal-actions .btn {
+      width: 100%;
+      min-width: auto;
+    }
+    
+    .quiz-meta {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 12px !important;
+      margin-top: 16px !important;
+    }
+    
+    #question-counter {
+      font-size: 16px !important;
+      font-weight: 600 !important;
+    }
+    
+    #timer {
+      font-size: 16px !important;
+      padding: 8px 12px !important;
+      border-radius: 8px !important;
+      background: #f8f9fa !important;
+    }
+    
+    .btn-icon {
+      width: 44px !important;
+      height: 44px !important;
+      border-radius: 50% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -914,10 +966,13 @@ function updateNextBtnStatus(){
     // Initialize the quiz
     document.addEventListener('DOMContentLoaded', initQuiz);
   </script>
-  <footer class="footer-copyright">
-  Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Agribank Chi nhánh Cần Thơ II.<br>  
-Liên hệ: Nguyễn Thành Trung 📱 Cellphone: 0947.86.86.82<br>📧 Email: trungnguyenthanh1@agribank.com.vn
-</footer>
+  <footer class="footer-copyright" style="text-align: center; padding: 20px; margin-top: 40px; background: #f8f6f8; border-top: 1px solid #eee; color: #800020;">
+    <strong>Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.</strong><br>  
+    Liên hệ: Nguyễn Thành Trung
+    📱 Cellphone: 0947.86.86.82
+    📧 Email: trungnguyenthanh1@agribank.com.vn
+  </footer>
+  <script src="mobile-touch.js"></script>
 </body>
 </html>
 

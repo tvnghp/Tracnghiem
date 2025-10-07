@@ -152,14 +152,14 @@ function parseExcelFile(file, callback) {
 
 function renderTopics() {
   const topics = getTopics();
-  const container = document.getElementById('topic-list-container');
+  const selector = document.getElementById('topic-selector');
+  const detailContainer = document.getElementById('topic-detail-container');
+  const gridContainer = document.getElementById('topic-list-container');
   
   if (topics.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i class="material-icons">folder_open</i>
-        <p>Chưa có chuyên đề nào</p>
-      </div>`;
+    selector.innerHTML = '<option value="">-- Chưa có chuyên đề --</option>';
+    detailContainer.style.display = 'none';
+    if (gridContainer) gridContainer.innerHTML = '<div class="empty-state"><i class="material-icons">folder_open</i><p>Chưa có chuyên đề nào</p></div>';
     const eb = document.getElementById('exam-topic-percents');
     if (eb) eb.innerHTML = '<p>Chưa có chuyên đề để chọn.</p>';
     renderExams([]);
@@ -169,58 +169,126 @@ function renderTopics() {
   const normalTopics = topics.filter(t => !t.isExam);
   const exams = topics.filter(t => t.isExam === true);
 
-  container.innerHTML = normalTopics.map(topic => `
-    <div class="topic-item">
-      <div class="topic-info">
-        <h3>${topic.name}</h3>
-        <div class="topic-meta">${topic.questions.length} câu hỏi</div>
+  // Populate topic selector dropdown
+  selector.innerHTML = '<option value="">-- Chọn chuyên đề --</option>' + 
+    normalTopics.map(topic => `<option value="${topic.id}">${topic.name} (${topic.questions.length} câu)</option>`).join('');
+  
+  // Clear detail on re-render
+  detailContainer.style.display = 'none';
+  
+  // Populate grid view
+  if (gridContainer) {
+    gridContainer.innerHTML = normalTopics.map(topic => `
+      <div class="topic-item">
+        <div class="topic-info">
+          <h3>${topic.name}</h3>
+          <div class="topic-meta">${topic.questions.length} câu hỏi</div>
+        </div>
+        <div>
+          <button onclick="openEditTopic('${topic.id}')" class="btn btn-outline" style="margin-right:8px;">
+            <i class="material-icons">edit</i> Sửa
+          </button>
+          <button onclick="delTopic('${topic.id}')" class="btn btn-delete">
+            <i class="material-icons">delete</i> Xóa
+          </button>
+        </div>
       </div>
-      <div>
-        <button onclick="openEditTopic('${topic.id}')" class="btn btn-outline" style="margin-right:8px;">
-          <i class="material-icons">edit</i> Sửa
-        </button>
-        <button onclick="delTopic('${topic.id}')" class="btn btn-delete">
-          <i class="material-icons">delete</i> Xóa
-        </button>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  }
 
   renderExamBuilderTopics(normalTopics);
   renderExams(exams);
 }
 
-function renderExams(exams) {
-  const container = document.getElementById('exam-list-container');
-  if (!container) return;
-  if (!exams || exams.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i class="material-icons">assignment</i>
-        <p>Chưa có bài thi nào</p>
-      </div>`;
+function updateExamView(exam) {
+  const editBtn = document.getElementById('edit-exam-btn');
+  const deleteBtn = document.getElementById('delete-exam-btn');
+  const detailContainer = document.getElementById('exam-detail-container');
+  
+  if (!exam) {
+    if (detailContainer) detailContainer.style.display = 'none';
+    if (editBtn) editBtn.disabled = true;
+    if (deleteBtn) deleteBtn.disabled = true;
     return;
   }
-  container.innerHTML = exams.map(exam => {
-    const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
-    const duration = (typeof exam.durationMinutes === 'number' && exam.durationMinutes > 0)
-      ? `${exam.durationMinutes} phút` : 'Không đặt thời gian';
-    return `
-    <div class="topic-item">
-      <div class="topic-info">
-        <h3>${exam.name}</h3>
-        <div class="topic-meta">${total} câu • ${duration}${exam.allowPause ? ' • Cho phép tạm dừng' : ''}</div>
-      </div>
-      <div>
-        <button onclick="openEditExam('${exam.id}')" class="btn btn-outline" style="margin-right:8px;">
-          <i class="material-icons">edit</i> Sửa
-        </button>
-        <button onclick="delTopic('${exam.id}')" class="btn btn-delete">
-          <i class="material-icons">delete</i> Xóa
-        </button>
-      </div>
-    </div>`;
-  }).join('');
+  
+  const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+  const duration = (typeof exam.durationMinutes === 'number' && exam.durationMinutes > 0)
+    ? exam.durationMinutes : 0;
+  
+  document.getElementById('selected-exam-name').textContent = exam.name;
+  document.getElementById('selected-exam-questions').textContent = total;
+  document.getElementById('selected-exam-duration').textContent = duration;
+  
+  if (detailContainer) detailContainer.style.display = 'block';
+  if (editBtn) {
+    editBtn.disabled = false;
+    editBtn.onclick = () => openEditExam(exam.id);
+  }
+  if (deleteBtn) {
+    deleteBtn.disabled = false;
+    deleteBtn.onclick = () => delTopic(exam.id);
+  }
+}
+
+function renderExams(exams) {
+  const selector = document.getElementById('exam-selector');
+  const detailContainer = document.getElementById('exam-detail-container');
+  const gridContainer = document.getElementById('exam-list-container');
+  
+  if (!selector) return;
+  
+  if (!exams || exams.length === 0) {
+    selector.innerHTML = '<option value="">-- Chưa có bài thi --</option>';
+    detailContainer.style.display = 'none';
+    if (gridContainer) gridContainer.innerHTML = '<div class="empty-state"><i class="material-icons">assignment</i><p>Chưa có bài thi nào</p></div>';
+    updateExamView(null);
+    return;
+  }
+  
+  // Populate exam selector dropdown
+  selector.innerHTML = '<option value="">-- Chọn bài thi --</option>' + 
+    exams.map(exam => {
+      const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+      const duration = (typeof exam.durationMinutes === 'number' && exam.durationMinutes > 0)
+        ? `${exam.durationMinutes}p` : 'N/A';
+      return `<option value="${exam.id}">${exam.name} (${total} câu, ${duration})</option>`;
+    }).join('');
+  
+  // Clear detail on re-render
+  detailContainer.style.display = 'none';
+  updateExamView(null);
+  
+  // Setup selector change event
+  selector.onchange = (e) => {
+    const examId = e.target.value;
+    const exam = exams.find(ex => ex.id === examId);
+    updateExamView(exam);
+  };
+  
+  // Populate grid view
+  if (gridContainer) {
+    gridContainer.innerHTML = exams.map(exam => {
+      const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+      const duration = (typeof exam.durationMinutes === 'number' && exam.durationMinutes > 0)
+        ? `${exam.durationMinutes} phút` : 'Không đặt thời gian';
+      return `
+      <div class="topic-item" data-id="${exam.id}">
+        <div class="topic-info">
+          <h3>${exam.name}</h3>
+          <div class="topic-meta">${total} câu • ${duration}${exam.allowPause ? ' • Cho phép tạm dừng' : ''}</div>
+        </div>
+        <div class="topic-actions">
+          <button onclick="openEditExam('${exam.id}')" class="btn btn-outline btn-sm">
+            <i class="material-icons">edit</i>
+          </button>
+          <button onclick="delTopic('${exam.id}')" class="btn btn-delete btn-sm">
+            <i class="material-icons">delete</i>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ===== Edit Topic Logic =====
@@ -394,6 +462,13 @@ window.delTopic = function(id) {
   if (removed && removed.isExam === true) {
     try { localStorage.removeItem(`quiz_exam_questions_${id}`); } catch(_) {}
   }
+  
+  // Reset selectors after deletion
+  document.getElementById('topic-selector').value = '';
+  document.getElementById('exam-selector').value = '';
+  document.getElementById('topic-detail-container').style.display = 'none';
+  document.getElementById('exam-detail-container').style.display = 'none';
+  
   renderTopics();
 };
 
@@ -406,46 +481,400 @@ function shuffleArray(arr) {
 }
 
 function renderExamBuilderTopics(topics) {
-  const holder = document.getElementById('exam-topic-percents');
-  if (!holder) return;
+  const holderDropdown = document.getElementById('exam-topic-percents');
+  const holderGrid = document.getElementById('exam-topic-percents-grid');
+  
   if (!topics || topics.length === 0) {
-    holder.innerHTML = '<p>Chưa có chuyên đề để chọn.</p>';
+    if (holderDropdown) holderDropdown.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">Chưa có chuyên đề để chọn. Vui lòng tạo chuyên đề trước.</p>';
+    if (holderGrid) holderGrid.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">Chưa có chuyên đề để chọn. Vui lòng tạo chuyên đề trước.</p>';
     return;
   }
 
-  holder.innerHTML = topics.map(t => `
-    <div class="topic-item" style="align-items:center; gap:12px;">
-      <label style="flex:1; display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" class="eb-topic-check" value="${t.id}">
-        <span>${t.name}</span>
-      </label>
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="number" class="eb-topic-percent" data-id="${t.id}" min="0" max="100" step="1" value="0" style="width:90px;">
-        <span>%</span>
-        <small style="color:#666">(${t.questions.length} câu)</small>
+  // Store topics globally for both views
+  window.examBuilderTopics = topics;
+
+  // Render dropdown view (simple interface)
+  if (holderDropdown) {
+    holderDropdown.innerHTML = `
+      <div id="exam-builder-combobox-rows" style="display: flex; flex-direction: column; gap: 12px;"></div>
+      <div id="percent-summary" style="padding: 12px; background: #e3f2fd; border-radius: 8px; text-align: center; font-weight: 500; margin-top: 16px;">
+        Tổng tỷ lệ: <span id="total-percent">0</span>%
       </div>
-    </div>
-  `).join('');
+    `;
 
-  holder.querySelectorAll('.eb-topic-percent').forEach(inp => {
-    inp.addEventListener('input', (e) => {
-      const id = e.target.getAttribute('data-id');
-      const chk = holder.querySelector(`.eb-topic-check[value="${id}"]`);
-      if (chk && parseFloat(e.target.value || '0') > 0) chk.checked = true;
-      normalizePercents(holder);
+    // Initialize with first empty row
+    renderComboboxRows();
+  }
+
+
+  // Render grid view (cards)
+  if (holderGrid) {
+    holderGrid.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+        ${topics.map(t => `
+          <div class="topic-item" style="padding: 16px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom: 12px;">
+              <input type="checkbox" class="eb-topic-check-grid" value="${t.id}" style="width: 20px; height: 20px;">
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 4px; color: #800020; font-size: 1.1rem;">${t.name}</h4>
+                <small style="color:#666">${t.questions.length} câu hỏi</small>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label style="font-weight: 500; min-width: 60px; color: #666;">Tỷ lệ:</label>
+              <input type="number" class="eb-topic-percent-grid" data-id="${t.id}" min="0" max="100" step="1" value="0" style="width:100px; padding: 8px; border-radius: 6px; border: 1px solid #ddd; font-size: 14px;" disabled>
+              <span style="font-weight: 500; color: #666;">%</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div id="grid-percent-summary" style="padding: 12px; background: #e3f2fd; border-radius: 8px; text-align: center; font-weight: 500; margin-top: 16px;">
+        Tổng tỷ lệ: <span id="grid-total-percent">0</span>%
+      </div>
+    `;
+
+    // Add event listeners for grid view
+    const gridCheckboxes = holderGrid.querySelectorAll('.eb-topic-check-grid');
+    const gridInputs = holderGrid.querySelectorAll('.eb-topic-percent-grid');
+    
+    gridCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const percentInput = holderGrid.querySelector(`.eb-topic-percent-grid[data-id="${this.value}"]`);
+        if (percentInput) {
+          percentInput.disabled = !this.checked;
+          if (!this.checked) {
+            percentInput.value = '0';
+          }
+        }
+        updateGridPercentSummary();
+        syncExamBuilderViews();
+      });
     });
-    inp.addEventListener('blur', () => normalizePercents(holder));
-  });
+    
+    gridInputs.forEach(input => {
+      input.addEventListener('input', function() {
+        updateGridPercentSummary();
+        syncExamBuilderViews();
+      });
+      input.addEventListener('change', function() {
+        const checkbox = holderGrid.querySelector(`.eb-topic-check-grid[value="${this.getAttribute('data-id')}"]`);
+        if (checkbox && parseFloat(this.value || '0') > 0) {
+          checkbox.checked = true;
+        }
+        updateGridPercentSummary();
+        syncExamBuilderViews();
+      });
+    });
+    
+    // Auto-distribute for grid view
+    function autoDistributeGrid() {
+      const checked = Array.from(gridCheckboxes).filter(cb => cb.checked);
+      if (checked.length > 0) {
+        const percentPerTopic = Math.floor(100 / checked.length);
+        const remainder = 100 - (percentPerTopic * checked.length);
+        
+        checked.forEach((checkbox, index) => {
+          const percentInput = holderGrid.querySelector(`.eb-topic-percent-grid[data-id="${checkbox.value}"]`);
+          if (percentInput) {
+            let percent = percentPerTopic;
+            if (index < remainder) percent += 1;
+            percentInput.value = percent;
+          }
+        });
+        updateGridPercentSummary();
+        syncExamBuilderViews();
+      }
+    }
+    
+    // Add auto-distribute button for grid view
+    const gridAutoBtn = document.createElement('button');
+    gridAutoBtn.type = 'button';
+    gridAutoBtn.textContent = 'Phân bổ đều';
+    gridAutoBtn.className = 'btn btn-outline';
+    gridAutoBtn.style.marginTop = '12px';
+    gridAutoBtn.onclick = autoDistributeGrid;
+    holderGrid.appendChild(gridAutoBtn);
+  }
 
-  holder.querySelectorAll('.eb-topic-check').forEach(chk => {
-    chk.addEventListener('change', () => normalizePercents(holder));
-  });
+  // Function to update grid percent summary
+  function updateGridPercentSummary() {
+    const summary = document.getElementById('grid-percent-summary');
+    const totalSpan = document.getElementById('grid-total-percent');
+    if (!summary || !totalSpan || !holderGrid) return;
+    
+    const inputs = holderGrid.querySelectorAll('.eb-topic-percent-grid');
+    let total = 0;
+    
+    inputs.forEach(input => {
+      if (!input.disabled) {
+        total += parseFloat(input.value || '0');
+      }
+    });
+    
+    totalSpan.textContent = total.toFixed(1);
+    
+    // Disable unchecked checkboxes if total >= 100%
+    const gridCheckboxes = holderGrid.querySelectorAll('.eb-topic-check-grid');
+    gridCheckboxes.forEach(checkbox => {
+      if (!checkbox.checked && total >= 100) {
+        checkbox.disabled = true;
+        checkbox.style.opacity = '0.5';
+        checkbox.style.cursor = 'not-allowed';
+      } else if (!checkbox.checked) {
+        checkbox.disabled = false;
+        checkbox.style.opacity = '1';
+        checkbox.style.cursor = 'pointer';
+      }
+    });
+    
+    // Change color based on total
+    if (total === 100) {
+      summary.style.background = '#d4edda';
+      summary.style.color = '#155724';
+      summary.style.border = '1px solid #c3e6cb';
+    } else if (total > 100) {
+      summary.style.background = '#f8d7da';
+      summary.style.color = '#721c24';
+      summary.style.border = '1px solid #f5c6cb';
+    } else {
+      summary.style.background = '#fff3cd';
+      summary.style.color = '#856404';
+      summary.style.border = '1px solid #ffeaa7';
+    }
+  }
 }
 
-function normalizePercents(scopeEl) {
+// Render dynamic dropdown rows for exam builder
+function renderExamBuilderDropdownRows(preserveFocus = false) {
+  const container = document.getElementById('exam-builder-dropdown-rows');
+  if (!container || !window.examBuilderTopics) return;
+  
+  // Get current selections and focused element
+  const rows = Array.from(container.querySelectorAll('.eb-dropdown-row'));
+  const focusedElement = document.activeElement;
+  const focusedIndex = focusedElement?.closest('.eb-dropdown-row') ? 
+    rows.indexOf(focusedElement.closest('.eb-dropdown-row')) : -1;
+  const focusedClass = focusedElement?.className || '';
+  
+  const selections = rows.map(row => {
+    const select = row.querySelector('.eb-topic-select');
+    const percentInput = row.querySelector('.eb-topic-percent-input');
+    return {
+      topicId: select?.value || '',
+      percent: parseFloat(percentInput?.value || '0')
+    };
+  }).filter(s => s.topicId);
+  
+  // Calculate total percent
+  const totalPercent = selections.reduce((sum, s) => sum + s.percent, 0);
+  const remaining = 100 - totalPercent;
+  
+  // Get already selected topic IDs
+  const selectedIds = selections.map(s => s.topicId);
+  
+  // Check if we need to add a new row
+  const needNewRow = remaining > 0 && selectedIds.length < window.examBuilderTopics.length;
+  const currentRowCount = rows.length;
+  const expectedRowCount = selections.length + (needNewRow ? 1 : 0);
+  
+  // Only rebuild if row count changed
+  if (currentRowCount !== expectedRowCount) {
+    container.innerHTML = '';
+    
+    // Add existing selections
+    selections.forEach((sel, index) => {
+      addExamBuilderDropdownRow(container, sel.topicId, sel.percent, selectedIds, index);
+    });
+    
+    // Add new row if not at 100%
+    if (needNewRow) {
+      addExamBuilderDropdownRow(container, '', 0, selectedIds, selections.length);
+    }
+    
+    // Restore focus if needed
+    if (preserveFocus && focusedIndex >= 0 && focusedIndex < container.children.length) {
+      const newRow = container.children[focusedIndex];
+      const elementToFocus = newRow?.querySelector('.' + focusedClass);
+      if (elementToFocus) {
+        setTimeout(() => elementToFocus.focus(), 0);
+      }
+    }
+  }
+  
+  // Update remaining display
+  updateRemainingPercent(remaining);
+}
+
+function addExamBuilderDropdownRow(container, selectedId = '', percent = 0, excludeIds = [], rowIndex = 0) {
+  const topics = window.examBuilderTopics || [];
+  const availableTopics = topics.filter(t => !excludeIds.includes(t.id) || t.id === selectedId);
+  
+  const row = document.createElement('div');
+  row.className = 'eb-dropdown-row';
+  row.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 10px; background: #fafafa; border-radius: 6px;';
+  
+  row.innerHTML = `
+    <div style="flex: 1;">
+      <select class="eb-topic-select" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ccc;">
+        <option value="">-- Chọn chuyên đề --</option>
+        ${availableTopics.map(t => `
+          <option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>
+            ${t.name} (${t.questions.length} câu)
+          </option>
+        `).join('')}
+      </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <input type="number" class="eb-topic-percent-input" min="0" max="100" step="0.01" value="${percent}" 
+             style="width: 100px; padding: 8px; border-radius: 5px; border: 1px solid #ccc;" 
+             ${!selectedId ? 'disabled' : ''}>
+      <span style="font-weight: 500;">%</span>
+    </div>
+    ${selectedId ? `
+      <button type="button" class="eb-remove-row" style="padding: 6px 10px; background: #c72c41; color: white; border: none; border-radius: 5px; cursor: pointer;">
+        <i class="material-icons" style="font-size: 18px;">close</i>
+      </button>
+    ` : ''}
+  `;
+  
+  container.appendChild(row);
+  
+  // Add event listeners
+  const select = row.querySelector('.eb-topic-select');
+  const percentInput = row.querySelector('.eb-topic-percent-input');
+  const removeBtn = row.querySelector('.eb-remove-row');
+  
+  select.addEventListener('change', () => {
+    if (select.value) {
+      percentInput.disabled = false;
+      setTimeout(() => percentInput.focus(), 0);
+    } else {
+      percentInput.disabled = true;
+      percentInput.value = '0';
+    }
+    renderExamBuilderDropdownRows(true);
+    syncExamBuilderViews();
+  });
+  
+  // Only update display while typing, don't rebuild
+  percentInput.addEventListener('input', () => {
+    const container = document.getElementById('exam-builder-dropdown-rows');
+    if (!container) return;
+    
+    const rows = Array.from(container.querySelectorAll('.eb-dropdown-row'));
+    const selections = rows.map(row => {
+      const sel = row.querySelector('.eb-topic-select');
+      const pct = row.querySelector('.eb-topic-percent-input');
+      return {
+        topicId: sel?.value || '',
+        percent: parseFloat(pct?.value || '0')
+      };
+    }).filter(s => s.topicId);
+    
+    const totalPercent = selections.reduce((sum, s) => sum + s.percent, 0);
+    const remaining = 100 - totalPercent;
+    updateRemainingPercent(remaining);
+  });
+  
+  percentInput.addEventListener('blur', () => {
+    // Rebuild rows on blur to add new row if needed
+    renderExamBuilderDropdownRows(false);
+    syncExamBuilderViews();
+  });
+  
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      renderExamBuilderDropdownRows();
+      syncExamBuilderViews();
+    });
+  }
+}
+
+function updateRemainingPercent(remaining) {
+  let display = document.getElementById('eb-remaining-display');
+  if (!display) {
+    const container = document.getElementById('exam-builder-dropdown-rows');
+    if (!container) return;
+    
+    display = document.createElement('div');
+    display.id = 'eb-remaining-display';
+    display.style.cssText = 'margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 6px; font-weight: 500;';
+    container.parentNode.insertBefore(display, container.nextSibling);
+  }
+  
+  const color = remaining === 0 ? '#28a745' : remaining < 0 ? '#dc3545' : '#666';
+  display.innerHTML = `
+    <span style="color: ${color};">
+      ${remaining === 0 ? '✓ Đã đủ 100%' : `Còn lại: ${remaining.toFixed(1)}%`}
+    </span>
+  `;
+}
+
+// Sync values between dropdown and grid views
+function syncExamBuilderViews() {
+  const dropdownView = document.getElementById('exam-builder-dropdown-view');
+  const gridView = document.getElementById('exam-builder-grid-view');
+  const currentView = localStorage.getItem('admin_exam_builder_view') || 'dropdown';
+  
+  if (currentView === 'dropdown' && dropdownView) {
+    // Sync from dropdown rows to grid
+    const rows = Array.from(dropdownView.querySelectorAll('.eb-dropdown-row'));
+    const selections = rows.map(row => {
+      const select = row.querySelector('.eb-topic-select');
+      const percentInput = row.querySelector('.eb-topic-percent-input');
+      return {
+        topicId: select?.value || '',
+        percent: parseFloat(percentInput?.value || '0')
+      };
+    }).filter(s => s.topicId);
+    
+    // Update grid view
+    if (gridView) {
+      gridView.querySelectorAll('.eb-topic-check-grid').forEach(chk => {
+        const sel = selections.find(s => s.topicId === chk.value);
+        chk.checked = !!sel;
+        const percentInput = gridView.querySelector(`.eb-topic-percent-grid[data-id="${chk.value}"]`);
+        if (percentInput) percentInput.value = sel ? sel.percent : 0;
+      });
+    }
+  } else if (currentView === 'grid' && gridView) {
+    // Sync from grid to dropdown - rebuild dropdown rows
+    const checksGrid = Array.from(gridView.querySelectorAll('.eb-topic-check-grid:checked'));
+    const selections = checksGrid.map(chk => {
+      const percentInput = gridView.querySelector(`.eb-topic-percent-grid[data-id="${chk.value}"]`);
+      return {
+        topicId: chk.value,
+        percent: parseFloat(percentInput?.value || '0')
+      };
+    });
+    
+    // Rebuild dropdown view
+    const container = document.getElementById('exam-builder-dropdown-rows');
+    if (container) {
+      container.innerHTML = '';
+      const selectedIds = selections.map(s => s.topicId);
+      selections.forEach((sel, index) => {
+        addExamBuilderDropdownRow(container, sel.topicId, sel.percent, selectedIds, index);
+      });
+      
+      const totalPercent = selections.reduce((sum, s) => sum + s.percent, 0);
+      const remaining = 100 - totalPercent;
+      if (remaining > 0 && selectedIds.length < (window.examBuilderTopics?.length || 0)) {
+        addExamBuilderDropdownRow(container, '', 0, selectedIds, selections.length);
+      }
+      updateRemainingPercent(remaining);
+    }
+  }
+}
+
+function normalizePercents(scopeEl, viewType = 'dropdown') {
   const root = scopeEl || document;
-  const checks = Array.from(root.querySelectorAll('.eb-topic-check')).filter(c => c.checked);
-  const percInputs = (id) => root.querySelector(`.eb-topic-percent[data-id="${id}"]`);
+  const checkClass = viewType === 'grid' ? '.eb-topic-check-grid' : '.eb-topic-check';
+  const percentClass = viewType === 'grid' ? '.eb-topic-percent-grid' : '.eb-topic-percent';
+  
+  const checks = Array.from(root.querySelectorAll(checkClass)).filter(c => c.checked);
+  const percInputs = (id) => root.querySelector(`${percentClass}[data-id="${id}"]`);
   if (checks.length === 0) return;
 
   const lastId = checks[checks.length - 1].value;
@@ -478,20 +907,88 @@ function buildCompositeExam(e) {
   if (!Number.isFinite(total) || total <= 0) { msg.textContent = 'Tổng số câu hỏi phải là số > 0!'; return; }
   if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) { msg.textContent = 'Thời gian làm bài phải là số phút > 0!'; return; }
 
-  const checks = Array.from(document.querySelectorAll('.eb-topic-check'));
-  const selected = checks.filter(c => c.checked).map(c => c.value);
-  if (selected.length === 0) { msg.textContent = 'Vui lòng chọn ít nhất 1 chuyên đề!'; return; }
-
-  const percInputs = Array.from(document.querySelectorAll('.eb-topic-percent'));
-  const dist = [];
+  // Get data from exam builder form
+  let dist = [];
   let sumPercent = 0;
-  for (const inp of percInputs) {
-    const id = inp.getAttribute('data-id');
-    const p = parseFloat(inp.value || '0');
-    if (!selected.includes(id)) continue;
-    if (p < 0 || p > 100 || !Number.isFinite(p)) { msg.textContent = 'Tỷ lệ phải trong khoảng 0-100!'; return; }
-    sumPercent += p;
-    dist.push({ id, percent: p });
+  
+  // Try to get from combobox interface first
+  const comboboxSelections = getComboboxSelections();
+
+  if (comboboxSelections.length > 0) {
+    // Get from dropdown view (combobox interface)
+    for (const sel of comboboxSelections) {
+      const p = sel.percent;
+      if (p < 0 || p > 100 || !Number.isFinite(p)) { 
+        msg.textContent = 'Tỷ lệ phải trong khoảng 0-100!'; 
+        return; 
+      }
+      sumPercent += p;
+      dist.push({ id: sel.id, percent: p });
+    }
+  } else {
+    // Try to get from grid view
+    const gridChecks = Array.from(document.querySelectorAll('.eb-topic-check-grid'));
+    const gridInputs = Array.from(document.querySelectorAll('.eb-topic-percent-grid'));
+    
+    if (gridChecks.length > 0) {
+      // Get from grid view
+      const selected = gridChecks.filter(c => c.checked).map(c => c.value);
+      if (selected.length === 0) { msg.textContent = 'Vui lòng chọn ít nhất 1 chuyên đề!'; return; }
+      
+      for (const input of gridInputs) {
+        const id = input.getAttribute('data-id');
+        const p = parseFloat(input.value || '0');
+        if (!selected.includes(id)) continue;
+        if (p < 0 || p > 100 || !Number.isFinite(p)) { 
+          msg.textContent = 'Tỷ lệ phải trong khoảng 0-100!'; 
+          return; 
+        }
+        sumPercent += p;
+        dist.push({ id, percent: p });
+      }
+    } else {
+    // Try to get from dropdown rows
+    const rows = Array.from(document.querySelectorAll('.eb-dropdown-row'));
+    if (rows.length > 0) {
+      // Get from dropdown rows
+      const selections = rows.map(row => {
+        const select = row.querySelector('.eb-topic-select');
+        const percentInput = row.querySelector('.eb-topic-percent-input');
+        return {
+          id: select?.value || '',
+          percent: parseFloat(percentInput?.value || '0')
+        };
+      }).filter(s => s.id);
+      
+      if (selections.length === 0) { msg.textContent = 'Vui lòng chọn ít nhất 1 chuyên đề!'; return; }
+      
+      for (const sel of selections) {
+        if (sel.percent < 0 || sel.percent > 100 || !Number.isFinite(sel.percent)) {
+          msg.textContent = 'Tỷ lệ phải trong khoảng 0-100!';
+          return;
+        }
+        sumPercent += sel.percent;
+        dist.push({ id: sel.id, percent: sel.percent });
+      }
+    } else {
+      // Fallback to simple form approach - use all topics with equal distribution
+      const normalTopics = allTopics.filter(t => !t.isExam);
+      if (normalTopics.length === 0) { 
+        msg.textContent = 'Chưa có chuyên đề nào để tạo đề thi!'; 
+        return; 
+      }
+      
+      // Distribute equally among all topics
+      const percentPerTopic = Math.floor(100 / normalTopics.length);
+      const remainder = 100 - (percentPerTopic * normalTopics.length);
+      normalTopics.forEach((topic, index) => {
+        let percent = percentPerTopic;
+        if (index < remainder) percent += 1; // Distribute remainder to first few topics
+        dist.push({ id: topic.id, percent: Math.round(percent) });
+        sumPercent += Math.round(percent);
+      });
+    }
+  }
   }
 
   if (Math.round(sumPercent) !== 100) {
@@ -563,19 +1060,484 @@ function exportTopicsJson() {
   URL.revokeObjectURL(url);
 }
 
+function importTopicsJson() {
+  const fileInput = document.getElementById('import-json-file');
+  fileInput.click();
+}
+
+function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = JSON.parse(evt.target.result);
+      
+      if (!Array.isArray(data)) {
+        alert('File không đúng định dạng! Phải là mảng JSON.');
+        return;
+      }
+      
+      // Validate basic structure
+      let valid = true;
+      for (const item of data) {
+        if (!item.id || !item.name || !Array.isArray(item.questions)) {
+          valid = false;
+          break;
+        }
+      }
+      
+      if (!valid) {
+        alert('File không đúng cấu trúc topics.json! Mỗi item phải có id, name, và questions.');
+        return;
+      }
+      
+      // Confirm before importing
+      const confirmMsg = `Bạn có chắc muốn import ${data.length} chuyên đề/bài thi?\n\nLưu ý: Dữ liệu hiện tại sẽ bị ghi đè!`;
+      if (!confirm(confirmMsg)) return;
+      
+      // Save to localStorage
+      saveTopics(data);
+      renderTopics();
+      alert(`Đã import thành công ${data.length} chuyên đề/bài thi!`);
+      
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi khi đọc file JSON: ' + (err.message || err));
+    }
+  };
+  
+  reader.onerror = () => {
+    alert('Không thể đọc file!');
+  };
+  
+  reader.readAsText(file);
+  
+  // Reset input để có thể chọn lại cùng file
+  e.target.value = '';
+}
+
+// View toggle functions
+function toggleTopicView() {
+  const dropdownView = document.getElementById('topic-dropdown-view');
+  const gridView = document.getElementById('topic-grid-view');
+  const toggleBtn = document.getElementById('topic-view-toggle');
+  const currentView = localStorage.getItem('admin_topic_view') || 'dropdown';
+  
+  if (!dropdownView || !gridView || !toggleBtn) return;
+  
+  // Sync values before switching
+  syncTopicViews();
+  
+  if (currentView === 'dropdown') {
+    // Switch to grid
+    dropdownView.style.display = 'none';
+    gridView.style.display = 'block';
+    toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+    localStorage.setItem('admin_topic_view', 'grid');
+  } else {
+    // Switch to dropdown
+    dropdownView.style.display = 'block';
+    gridView.style.display = 'none';
+    toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+    localStorage.setItem('admin_topic_view', 'dropdown');
+  }
+}
+
+function syncTopicViews() {
+  const topicId = document.getElementById('topic-selector')?.value;
+  if (topicId && document.querySelectorAll('#topic-list-container .topic-item').length > 0) {
+    document.querySelectorAll('#topic-list-container .topic-item').forEach(el => {
+      el.classList.toggle('selected', el.dataset.id === topicId);
+    });
+  }
+}
+
+function toggleExamView() {
+  const dropdownView = document.getElementById('exam-dropdown-view');
+  const gridView = document.getElementById('exam-grid-view');
+  const toggleBtn = document.getElementById('exam-view-toggle');
+  const currentView = localStorage.getItem('admin_exam_view') || 'dropdown';
+  
+  if (!dropdownView || !gridView || !toggleBtn) return;
+  
+  if (currentView === 'dropdown') {
+    // Switch to grid
+    dropdownView.style.display = 'none';
+    gridView.style.display = 'block';
+    toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+    localStorage.setItem('admin_exam_view', 'grid');
+    
+    // Sync selection from dropdown to grid
+    const examId = document.getElementById('exam-selector').value;
+    if (examId) {
+      document.querySelectorAll('#exam-list-container .topic-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.id === examId);
+      });
+    }
+  } else {
+    // Switch to dropdown
+    dropdownView.style.display = 'block';
+    gridView.style.display = 'none';
+    toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+    localStorage.setItem('admin_exam_view', 'dropdown');
+    
+    // Sync selection from grid to dropdown
+    const selectedExam = document.querySelector('#exam-list-container .topic-item.selected');
+    if (selectedExam) {
+      const examId = selectedExam.dataset.id;
+      document.getElementById('exam-selector').value = examId;
+    }
+  }
+}
+
+function toggleExamBuilderView() {
+  const dropdownView = document.getElementById('exam-builder-dropdown-view');
+  const gridView = document.getElementById('exam-builder-grid-view');
+  const toggleBtn = document.getElementById('exam-builder-view-toggle');
+  const currentView = localStorage.getItem('admin_exam_builder_view') || 'dropdown';
+  
+  // Sync values before switching
+  syncExamBuilderViews();
+  
+  if (currentView === 'dropdown') {
+    // Switch to grid
+    if (dropdownView) dropdownView.style.display = 'none';
+    if (gridView) gridView.style.display = 'block';
+    if (toggleBtn) toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+    localStorage.setItem('admin_exam_builder_view', 'grid');
+  } else {
+    // Switch to dropdown
+    if (dropdownView) dropdownView.style.display = 'block';
+    if (gridView) gridView.style.display = 'none';
+    if (toggleBtn) toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+    localStorage.setItem('admin_exam_builder_view', 'dropdown');
+  }
+}
+
+function initializeViews() {
+  const topicView = localStorage.getItem('admin_topic_view') || 'dropdown';
+  const examView = localStorage.getItem('admin_exam_view') || 'dropdown';
+  const examBuilderView = localStorage.getItem('admin_exam_builder_view') || 'dropdown';
+  
+  // Set topic view
+  const topicDropdown = document.getElementById('topic-dropdown-view');
+  const topicGrid = document.getElementById('topic-grid-view');
+  const topicToggleBtn = document.getElementById('topic-view-toggle');
+  
+  if (topicView === 'grid') {
+    topicDropdown.style.display = 'none';
+    topicGrid.style.display = 'block';
+    topicToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+  } else {
+    topicDropdown.style.display = 'block';
+    topicGrid.style.display = 'none';
+    topicToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+  }
+  
+  // Set exam view
+  const examDropdown = document.getElementById('exam-dropdown-view');
+  const examGrid = document.getElementById('exam-grid-view');
+  const examToggleBtn = document.getElementById('exam-view-toggle');
+  
+  if (examView === 'grid') {
+    examDropdown.style.display = 'none';
+    examGrid.style.display = 'block';
+    examToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+  } else {
+    examDropdown.style.display = 'block';
+    examGrid.style.display = 'none';
+    examToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+  }
+  
+  // Set exam builder view
+  const examBuilderDropdown = document.getElementById('exam-builder-dropdown-view');
+  const examBuilderGrid = document.getElementById('exam-builder-grid-view');
+  const examBuilderToggleBtn = document.getElementById('exam-builder-view-toggle');
+  
+  if (examBuilderView === 'grid') {
+    if (examBuilderDropdown) examBuilderDropdown.style.display = 'none';
+    if (examBuilderGrid) examBuilderGrid.style.display = 'block';
+    if (examBuilderToggleBtn) examBuilderToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+  } else {
+    if (examBuilderDropdown) examBuilderDropdown.style.display = 'block';
+    if (examBuilderGrid) examBuilderGrid.style.display = 'none';
+    if (examBuilderToggleBtn) examBuilderToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+  }
+}
+
+// Topic management functions
+function renderTopicItem(topic, container) {
+  const topicEl = document.createElement('div');
+  topicEl.className = 'topic-item';
+  topicEl.dataset.id = topic.id;
+  topicEl.innerHTML = `
+    <div class="topic-info">
+      <h3>${topic.name}</h3>
+      <div class="topic-meta">
+        ${topic.questions ? topic.questions.length : 0} câu hỏi
+      </div>
+    </div>
+    <div class="topic-actions">
+      <button class="btn btn-outline btn-sm edit-topic" data-id="${topic.id}">
+        <i class="material-icons">edit</i>
+      </button>
+      <button class="btn btn-delete btn-sm delete-topic" data-id="${topic.id}">
+        <i class="material-icons">delete</i>
+      </button>
+    </div>
+  `;
+  
+  if (container) {
+    container.appendChild(topicEl);
+  }
+  
+  return topicEl;
+}
+
+function updateTopicView(topic) {
+  if (!topic) {
+    document.getElementById('topic-detail-container').style.display = 'none';
+    document.getElementById('edit-topic-btn').disabled = true;
+    document.getElementById('delete-topic-btn').disabled = true;
+    return;
+  }
+  
+  document.getElementById('selected-topic-name').textContent = topic.name;
+  document.getElementById('selected-topic-questions').textContent = topic.questions ? topic.questions.length : 0;
+  document.getElementById('topic-detail-container').style.display = 'block';
+  document.getElementById('edit-topic-btn').disabled = false;
+  document.getElementById('delete-topic-btn').disabled = false;
+  
+  // Store current topic ID in edit/delete buttons
+  const topicId = topic.id;
+  document.getElementById('edit-topic-btn').onclick = () => openEditTopic(topicId);
+  document.getElementById('delete-topic-btn').onclick = () => delTopic(topicId);
+}
+
+function renderTopicDropdown(topics) {
+  const selector = document.getElementById('topic-selector');
+  selector.innerHTML = '<option value="">-- Chọn chuyên đề --</option>';
+  
+  topics.forEach(topic => {
+    const option = document.createElement('option');
+    option.value = topic.id;
+    option.textContent = topic.name;
+    selector.appendChild(option);
+  });
+  
+  selector.onchange = (e) => {
+    const topicId = e.target.value;
+    const topic = topics.find(t => t.id === topicId);
+    updateTopicView(topic);
+  };
+}
+
+function renderTopicGrid(topics) {
+  const container = document.getElementById('topic-list-container');
+  container.innerHTML = '';
+  
+  if (topics.length === 0) {
+    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #666;">Chưa có chuyên đề nào</p>';
+    return;
+  }
+  
+  topics.forEach(topic => {
+    const topicEl = renderTopicItem(topic);
+    container.appendChild(topicEl);
+    
+    // Add event listeners for edit/delete buttons
+    topicEl.querySelector('.edit-topic').onclick = (e) => {
+      e.stopPropagation();
+      openEditTopic(topic.id);
+    };
+    
+    topicEl.querySelector('.delete-topic').onclick = (e) => {
+      e.stopPropagation();
+      delTopic(topic.id);
+    };
+    
+    topicEl.onclick = () => {
+      // Toggle selection
+      document.querySelectorAll('.topic-item').forEach(el => el.classList.remove('selected'));
+      topicEl.classList.add('selected');
+      updateTopicView(topic);
+    };
+  });
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
   if (checkAuth()) {
     showAdminPanel();
+    initializeViews();
+    
+    // Initialize topic management
+    const topics = getTopics();
+    renderTopicDropdown(topics);
+    renderTopicGrid(topics);
+    
+    // Add new topic button
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+      addTopicBtn.onclick = () => {
+        const topicFormContainer = document.querySelector('.topic-form');
+        if (topicFormContainer) topicFormContainer.scrollIntoView({ behavior: 'smooth' });
+      };
+    }
+    
+    // Save topic form
+    const topicForm = document.getElementById('topic-form');
+    if (topicForm) {
+      topicForm.onsubmit = (e) => {
+        e.preventDefault();
+        const topicName = document.getElementById('topic-name').value.trim();
+        const fileInput = document.getElementById('file-quiz');
+        const msgEl = document.getElementById('topic-msg');
+        
+        if (!topicName) {
+          msgEl.textContent = 'Vui lòng nhập tên chuyên đề';
+          msgEl.className = 'ml-2 error';
+          return;
+        }
+        
+        if (!fileInput.files || fileInput.files.length === 0) {
+          msgEl.textContent = 'Vui lòng chọn file Excel câu hỏi';
+          msgEl.className = 'ml-2 error';
+          return;
+        }
+        
+        parseExcelFile(fileInput.files[0], (result) => {
+          if (result.error) {
+            msgEl.textContent = result.error;
+            msgEl.className = 'ml-2 error';
+            return;
+          }
+          
+          const topics = getTopics();
+          const newTopic = {
+            id: uuid(),
+            name: topicName,
+            questions: result.questions,
+            createdAt: new Date().toISOString()
+          };
+          
+          topics.push(newTopic);
+          saveTopics(topics);
+          
+          // Reset form
+          topicForm.reset();
+          msgEl.textContent = 'Đã thêm chuyên đề thành công!';
+          msgEl.className = 'ml-2 success';
+          
+          // Refresh views
+          renderTopics();
+          
+          setTimeout(() => {
+            msgEl.textContent = '';
+            msgEl.className = '';
+          }, 3000);
+        });
+      };
+    }
+    
   } else {
     showLoginForm();
   }
 
-  document.getElementById('login-form').addEventListener('submit', handleLogin);
-  document.getElementById('logout-btn').addEventListener('click', handleLogout);
+  // Login form handler
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+  
+  // View toggle handlers
+  const topicToggle = document.getElementById('topic-view-toggle');
+  if (topicToggle) topicToggle.addEventListener('click', toggleTopicView);
+  
+  const examToggle = document.getElementById('exam-view-toggle');
+  if (examToggle) examToggle.addEventListener('click', toggleExamView);
+  
+  const examBuilderToggle = document.getElementById('exam-builder-view-toggle');
+  if (examBuilderToggle) examBuilderToggle.addEventListener('click', toggleExamBuilderView);
+  
+  // Topic selector change handler
+  const topicSelector = document.getElementById('topic-selector');
+  if (topicSelector) topicSelector.addEventListener('change', function(e) {
+    const topicId = e.target.value;
+    const detailContainer = document.getElementById('topic-detail-container');
+    const detailDiv = document.getElementById('selected-topic-detail');
+    
+    if (!topicId) {
+      detailContainer.style.display = 'none';
+      return;
+    }
+    
+    const topics = getTopics();
+    const topic = topics.find(t => t.id === topicId && !t.isExam);
+    
+    if (topic) {
+      detailDiv.innerHTML = `
+        <div class="topic-info">
+          <h3>${topic.name}</h3>
+          <div class="topic-meta">${topic.questions.length} câu hỏi</div>
+        </div>
+        <div>
+          <button onclick="openEditTopic('${topic.id}')" class="btn btn-outline" style="margin-right:8px;">
+            <i class="material-icons">edit</i> Sửa
+          </button>
+          <button onclick="delTopic('${topic.id}')" class="btn btn-delete">
+            <i class="material-icons">delete</i> Xóa
+          </button>
+        </div>
+      `;
+      detailContainer.style.display = 'block';
+    }
+  });
+  
+  // Exam selector change handler
+  const examSelector = document.getElementById('exam-selector');
+  if (examSelector) examSelector.addEventListener('change', function(e) {
+    const examId = e.target.value;
+    const detailContainer = document.getElementById('exam-detail-container');
+    const detailDiv = document.getElementById('selected-exam-detail');
+    
+    if (!examId) {
+      detailContainer.style.display = 'none';
+      return;
+    }
+    
+    const topics = getTopics();
+    const exam = topics.find(t => t.id === examId && t.isExam);
+    
+    if (exam) {
+      const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+      const duration = (typeof exam.durationMinutes === 'number' && exam.durationMinutes > 0)
+        ? `${exam.durationMinutes} phút` : 'Không đặt thời gian';
+      
+      detailDiv.innerHTML = `
+        <div class="topic-info">
+          <h3>${exam.name}</h3>
+          <div class="topic-meta">${total} câu • ${duration}${exam.allowPause ? ' • Cho phép tạm dừng' : ''}</div>
+        </div>
+        <div>
+          <button onclick="openEditExam('${exam.id}')" class="btn btn-outline" style="margin-right:8px;">
+            <i class="material-icons">edit</i> Sửa
+          </button>
+          <button onclick="delTopic('${exam.id}')" class="btn btn-delete">
+            <i class="material-icons">delete</i> Xóa
+          </button>
+        </div>
+      `;
+      detailContainer.style.display = 'block';
+    }
+  });
   
   // Topic form
-  document.getElementById('topic-form').addEventListener('submit', function(e) {
+  const topicFormSubmit = document.getElementById('topic-form');
+  if (topicFormSubmit) topicFormSubmit.addEventListener('submit', function(e) {
     e.preventDefault();
     const name = document.getElementById('topic-name').value.trim();
     const fileInput = document.getElementById('file-quiz');
@@ -607,21 +1569,34 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Edit Topic modal handlers
-  document.getElementById('edit-topic-form').addEventListener('submit', saveEditTopic);
-  document.getElementById('edit-topic-cancel').addEventListener('click', () => {
+  const editTopicForm = document.getElementById('edit-topic-form');
+  if (editTopicForm) editTopicForm.addEventListener('submit', saveEditTopic);
+  
+  const editTopicCancel = document.getElementById('edit-topic-cancel');
+  if (editTopicCancel) editTopicCancel.addEventListener('click', () => {
     document.getElementById('edit-topic-modal').classList.add('hidden');
   });
   
   // Edit Exam modal handlers
-  document.getElementById('edit-exam-form').addEventListener('submit', saveEditExam);
-  document.getElementById('edit-exam-cancel').addEventListener('click', () => {
+  const editExamForm = document.getElementById('edit-exam-form');
+  if (editExamForm) editExamForm.addEventListener('submit', saveEditExam);
+  
+  const editExamCancel = document.getElementById('edit-exam-cancel');
+  if (editExamCancel) editExamCancel.addEventListener('click', () => {
     document.getElementById('edit-exam-modal').classList.add('hidden');
   });
   
   // Exam Builder
-  document.getElementById('exam-builder-form').addEventListener('submit', buildCompositeExam);
+  const examBuilderForm = document.getElementById('exam-builder-form');
+  if (examBuilderForm) examBuilderForm.addEventListener('submit', buildCompositeExam);
   
   // Export
   const exportBtn = document.getElementById('export-json-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportTopicsJson);
+  // Import
+  const importBtn = document.getElementById('import-json-btn');
+  if (importBtn) importBtn.addEventListener('click', importTopicsJson);
+  
+  const importFileInput = document.getElementById('import-json-file');
+  if (importFileInput) importFileInput.addEventListener('change', handleImportFile);
 });

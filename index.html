@@ -5,7 +5,12 @@
   <title>Hệ thống ôn luyện trắc nghiệm Chi nhánh Cần Thơ II</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mobile-enhancements.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <meta name="theme-color" content="#800020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Quiz Cần Thơ II">
 </head>
 <body>
   <div class="container">
@@ -22,13 +27,63 @@
       </div>
 
       <section class="mt-4">
-        <h3>Chuyên đề (không giới hạn thời gian)</h3>
-        <div id="topics-container" class="topics-grid"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0;">Chuyên đề (không giới hạn thời gian)</h3>
+          <button id="topic-view-toggle" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">
+            <i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới
+          </button>
+        </div>
+        
+        <!-- Dropdown View -->
+        <div id="topic-dropdown-view">
+          <div class="form-group">
+            <label for="topic-select">Chọn chuyên đề để bắt đầu</label>
+            <select id="topic-select" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #d4a5a5; font-size: 1rem;">
+              <option value="">-- Chọn chuyên đề --</option>
+            </select>
+          </div>
+          <div id="topic-info" style="display: none; margin-top: 16px; padding: 16px; background: #f8f6f8; border-radius: 8px; border-left: 4px solid #800020;">
+            <p id="topic-description" style="margin: 0 0 12px; color: #666;"></p>
+            <a id="topic-start-btn" href="#" class="btn" style="display: inline-flex;">
+              <i class="material-icons">play_arrow</i> Bắt đầu
+            </a>
+          </div>
+        </div>
+        
+        <!-- Grid View -->
+        <div id="topic-grid-view" style="display: none;">
+          <div id="topics-container" class="topics-grid"></div>
+        </div>
       </section>
 
       <section class="mt-4">
-        <h3>Bài thi (có thời gian)</h3>
-        <div id="exams-container" class="topics-grid"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0;">Bài thi (có thời gian)</h3>
+          <button id="exam-view-toggle" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.9rem;">
+            <i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới
+          </button>
+        </div>
+        
+        <!-- Dropdown View -->
+        <div id="exam-dropdown-view">
+          <div class="form-group">
+            <label for="exam-select">Chọn bài thi để bắt đầu</label>
+            <select id="exam-select" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #d4a5a5; font-size: 1rem;">
+              <option value="">-- Chọn bài thi --</option>
+            </select>
+          </div>
+          <div id="exam-info" style="display: none; margin-top: 16px; padding: 16px; background: #f8f6f8; border-radius: 8px; border-left: 4px solid #800020;">
+            <p id="exam-description" style="margin: 0 0 12px; color: #666;"></p>
+            <a id="exam-start-btn" href="#" class="btn" style="display: inline-flex;">
+              <i class="material-icons">play_arrow</i> Bắt đầu thi
+            </a>
+          </div>
+        </div>
+        
+        <!-- Grid View -->
+        <div id="exam-grid-view" style="display: none;">
+          <div id="exams-container" class="topics-grid"></div>
+        </div>
       </section>
 
       <div class="admin-section">
@@ -46,26 +101,22 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        const topicsContainer = document.getElementById('topics-container');
-        const examsContainer = document.getElementById('exams-container');
+        const topicSelect = document.getElementById('topic-select');
+        const examSelect = document.getElementById('exam-select');
+        const topicInfo = document.getElementById('topic-info');
+        const examInfo = document.getElementById('exam-info');
+        const topicDescription = document.getElementById('topic-description');
+        const examDescription = document.getElementById('exam-description');
+        const topicStartBtn = document.getElementById('topic-start-btn');
+        const examStartBtn = document.getElementById('exam-start-btn');
         const clearCookiesBtn = document.getElementById('clear-cookies-btn');
         const clearStorageBtn = document.getElementById('clear-storage-btn');
 
         function showEmptyState() {
-          topicsContainer.innerHTML = `
-            <div class="empty-state">
-              <i class="material-icons">folder_open</i>
-              <p>Chưa có chuyên đề nào</p>
-              <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
-            </div>`;
-          if (examsContainer) {
-            examsContainer.innerHTML = `
-              <div class="empty-state">
-                <i class="material-icons">assignment</i>
-                <p>Chưa có bài thi nào</p>
-                <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
-              </div>`;
-          }
+          topicSelect.innerHTML = '<option value="">-- Chưa có chuyên đề --</option>';
+          examSelect.innerHTML = '<option value="">-- Chưa có bài thi --</option>';
+          topicInfo.style.display = 'none';
+          examInfo.style.display = 'none';
         }
 
         function clearAllCookies() {
@@ -118,29 +169,54 @@
           const exams = all.filter(t => t && (t.isExam === true || (typeof t.durationMinutes === 'number' && t.durationMinutes > 0)));
           const topics = all.filter(t => !(t && (t.isExam === true || (typeof t.durationMinutes === 'number' && t.durationMinutes > 0))));
 
-          topicsContainer.innerHTML = topics.length ? topics.map(topic => `
-            <div class="topic-card">
-              <div class="topic-card-content">
-                <h3>${topic.name}</h3>
-                <p>${topic.questions ? topic.questions.length : 0} câu hỏi</p>
-                <a href="quiz.html?topic=${encodeURIComponent(topic.id)}" class="btn">
-                  <i class="material-icons">play_arrow</i> Bắt đầu
-                </a>
-              </div>
-            </div>
-          `).join('') : `
-            <div class="empty-state">
-              <i class="material-icons">folder_open</i>
-              <p>Chưa có chuyên đề nào</p>
-              <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
-            </div>`;
+          // Populate topic dropdown
+          if (topics.length > 0) {
+            topicSelect.innerHTML = '<option value="">-- Chọn chuyên đề --</option>' + 
+              topics.map(topic => `<option value="${topic.id}">${topic.name} (${topic.questions ? topic.questions.length : 0} câu)</option>`).join('');
+          } else {
+            topicSelect.innerHTML = '<option value="">-- Chưa có chuyên đề --</option>';
+          }
 
+          // Populate exam dropdown
+          if (exams.length > 0) {
+            examSelect.innerHTML = '<option value="">-- Chọn bài thi --</option>' + 
+              exams.map(exam => {
+                const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+                const duration = exam.durationMinutes ? (exam.durationMinutes + ' phút') : 'N/A';
+                return `<option value="${exam.id}">${exam.name} (${total} câu, ${duration})</option>`;
+              }).join('');
+          } else {
+            examSelect.innerHTML = '<option value="">-- Chưa có bài thi --</option>';
+          }
+
+          // Populate topic grid
+          const topicsContainer = document.getElementById('topics-container');
+          if (topicsContainer) {
+            topicsContainer.innerHTML = topics.length ? topics.map(topic => `
+              <div class="topic-card">
+                <div class="topic-card-content">
+                  <h3>${topic.name}</h3>
+                  <p>${topic.questions ? topic.questions.length : 0} câu hỏi</p>
+                  <a href="quiz.html?topic=${encodeURIComponent(topic.id)}" class="btn">
+                    <i class="material-icons">play_arrow</i> Bắt đầu
+                  </a>
+                </div>
+              </div>
+            `).join('') : `
+              <div class="empty-state">
+                <i class="material-icons">folder_open</i>
+                <p>Chưa có chuyên đề nào</p>
+              </div>`;
+          }
+
+          // Populate exam grid
+          const examsContainer = document.getElementById('exams-container');
           if (examsContainer) {
             examsContainer.innerHTML = exams.length ? exams.map(exam => `
               <div class="topic-card">
                 <div class="topic-card-content">
                   <h3>${exam.name}</h3>
-                  <p>${exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0)} câu • ${exam.durationMinutes ? (exam.durationMinutes + ' phút') : 'Không rõ thời gian'}</p>
+                  <p>${exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0)} câu • ${exam.durationMinutes ? (exam.durationMinutes + ' phút') : 'N/A'}</p>
                   <a href="quiz.html?topic=${encodeURIComponent(exam.id)}" class="btn">
                     <i class="material-icons">play_arrow</i> Bắt đầu
                   </a>
@@ -150,10 +226,156 @@
               <div class="empty-state">
                 <i class="material-icons">assignment</i>
                 <p>Chưa có bài thi nào</p>
-                <p>Vui lòng liên hệ quản trị viên để thêm dữ liệu.</p>
               </div>`;
           }
+
+          // Store data for later use
+          window.allTopics = topics;
+          window.allExams = exams;
         }
+
+        // View toggle functions
+        function toggleTopicView() {
+          const dropdownView = document.getElementById('topic-dropdown-view');
+          const gridView = document.getElementById('topic-grid-view');
+          const toggleBtn = document.getElementById('topic-view-toggle');
+          const currentView = localStorage.getItem('index_topic_view') || 'dropdown';
+          
+          if (currentView === 'dropdown') {
+            dropdownView.style.display = 'none';
+            gridView.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+            localStorage.setItem('index_topic_view', 'grid');
+          } else {
+            dropdownView.style.display = 'block';
+            gridView.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+            localStorage.setItem('index_topic_view', 'dropdown');
+          }
+        }
+
+        function toggleExamView() {
+          const dropdownView = document.getElementById('exam-dropdown-view');
+          const gridView = document.getElementById('exam-grid-view');
+          const toggleBtn = document.getElementById('exam-view-toggle');
+          const currentView = localStorage.getItem('index_exam_view') || 'dropdown';
+          
+          if (currentView === 'dropdown') {
+            dropdownView.style.display = 'none';
+            gridView.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+            localStorage.setItem('index_exam_view', 'grid');
+          } else {
+            dropdownView.style.display = 'block';
+            gridView.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+            localStorage.setItem('index_exam_view', 'dropdown');
+          }
+        }
+
+        function initializeViews() {
+          const topicView = localStorage.getItem('index_topic_view') || 'dropdown';
+          const examView = localStorage.getItem('index_exam_view') || 'dropdown';
+          
+          const topicDropdown = document.getElementById('topic-dropdown-view');
+          const topicGrid = document.getElementById('topic-grid-view');
+          const topicToggleBtn = document.getElementById('topic-view-toggle');
+          
+          if (topicView === 'grid') {
+            topicDropdown.style.display = 'none';
+            topicGrid.style.display = 'block';
+            topicToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+          } else {
+            topicDropdown.style.display = 'block';
+            topicGrid.style.display = 'none';
+            topicToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+          }
+          
+          const examDropdown = document.getElementById('exam-dropdown-view');
+          const examGrid = document.getElementById('exam-grid-view');
+          const examToggleBtn = document.getElementById('exam-view-toggle');
+          
+          if (examView === 'grid') {
+            examDropdown.style.display = 'none';
+            examGrid.style.display = 'block';
+            examToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">list</i> Chế độ dropdown';
+          } else {
+            examDropdown.style.display = 'block';
+            examGrid.style.display = 'none';
+            examToggleBtn.innerHTML = '<i class="material-icons" style="font-size: 1.2rem;">view_module</i> Chế độ lưới';
+          }
+        }
+
+        // Initialize views on load
+        initializeViews();
+
+        // View toggle event listeners with touch optimization
+        document.getElementById('topic-view-toggle').addEventListener('click', toggleTopicView);
+        document.getElementById('exam-view-toggle').addEventListener('click', toggleExamView);
+
+        // Add touch optimization for mobile
+        if ('ontouchstart' in window) {
+          document.body.classList.add('touch-device');
+          
+          // Optimize button interactions for touch
+          document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('touchstart', function() {
+              this.style.transform = 'scale(0.95)';
+            });
+            
+            btn.addEventListener('touchend', function() {
+              this.style.transform = '';
+            });
+          });
+
+          // Optimize answer interactions for touch
+          document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.answer').forEach(answer => {
+              answer.addEventListener('touchstart', function() {
+                this.style.transform = 'scale(0.98)';
+              });
+              
+              answer.addEventListener('touchend', function() {
+                this.style.transform = '';
+              });
+            });
+          });
+        }
+
+        // Topic selector change handler
+        topicSelect.addEventListener('change', function(e) {
+          const topicId = e.target.value;
+          if (!topicId) {
+            topicInfo.style.display = 'none';
+            return;
+          }
+          
+          const topic = window.allTopics.find(t => t.id === topicId);
+          if (topic) {
+            topicDescription.textContent = `${topic.questions ? topic.questions.length : 0} câu hỏi • Không giới hạn thời gian`;
+            topicStartBtn.href = `quiz.html?topic=${encodeURIComponent(topic.id)}`;
+            topicInfo.style.display = 'block';
+          }
+        });
+
+        // Exam selector change handler
+        examSelect.addEventListener('change', function(e) {
+          const examId = e.target.value;
+          if (!examId) {
+            examInfo.style.display = 'none';
+            return;
+          }
+          
+          const exam = window.allExams.find(t => t.id === examId);
+          if (exam) {
+            const total = exam.examConfig?.total ?? (exam.questions ? exam.questions.length : 0);
+            const duration = exam.durationMinutes ? (exam.durationMinutes + ' phút') : 'Không rõ thời gian';
+            const pauseText = exam.allowPause ? ' • Cho phép tạm dừng' : '';
+            examDescription.textContent = `${total} câu hỏi • ${duration}${pauseText}`;
+            examStartBtn.href = `quiz.html?topic=${encodeURIComponent(exam.id)}`;
+            examInfo.style.display = 'block';
+          }
+        });
 
         async function loadTopics() {
           const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
@@ -184,12 +406,15 @@
       });
     </script>
 
-    <footer class="footer-copyright">
-      Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.<br>  
-      Liên hệ:
-      Nguyễn Thành Trung
-      📱 Cellphone: 0947.86.86.82
-      📧 Email: trungnguyenthanh1@agribank.com.vn
-    </footer>
-  </body>
+  </div>
+  
+  <footer class="footer-copyright" style="text-align: center; padding: 20px; margin-top: 40px; background: #f8f6f8; border-top: 1px solid #eee; color: #800020;">
+    <strong>Bản quyền © 2025 Hệ thống ôn luyện trắc nghiệm Cần Thơ II.</strong><br>  
+    Liên hệ: Nguyễn Thành Trung
+    📱 Cellphone: 0947.86.86.82
+    📧 Email: trungnguyenthanh1@agribank.com.vn
+  </footer>
+  
+  <script src="mobile-touch.js"></script>
+</body>
 </html>
