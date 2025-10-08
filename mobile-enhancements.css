@@ -665,58 +665,6 @@ input, textarea, select {
     }
   }
   
-  /* Dark mode support */
-  @media (prefers-color-scheme: dark) {
-    .container {
-      background: #1a1a1a !important;
-      color: #e0e0e0 !important;
-    }
-    
-    .topic-card,
-    .topic-item,
-    .modal-content {
-      background: #2a2a2a !important;
-      color: #e0e0e0 !important;
-      border-color: #404040 !important;
-    }
-    
-    .answer {
-      background: #2a2a2a !important;
-      color: #e0e0e0 !important;
-      border-color: #404040 !important;
-    }
-    
-    .answer:hover,
-    .answer.selected {
-      background: rgba(128, 0, 32, 0.3) !important;
-      border-color: var(--primary-color) !important;
-    }
-    
-    input,
-    select,
-    textarea {
-      background: #2a2a2a !important;
-      color: #e0e0e0 !important;
-      border-color: #404040 !important;
-    }
-    
-    .question {
-      background: #2a2a2a !important;
-      color: #e0e0e0 !important;
-      border-color: #404040 !important;
-    }
-    
-    .welcome-section {
-      background: #2a2a2a !important;
-      border-color: #404040 !important;
-    }
-    
-    .footer-copyright {
-      background: #1a1a1a !important;
-      color: #e0e0e0 !important;
-      border-color: #404040 !important;
-    }
-  }
   
   /* Safe area support for notched devices */
   .container {
