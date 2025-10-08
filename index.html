@@ -3,14 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <title>Hệ thống ôn luyện trắc nghiệm Chi nhánh Cần Thơ II</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="mobile-enhancements.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <!-- Theme and PWA meta tags -->
   <meta name="theme-color" content="#800020">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  
+  <!-- iOS specific meta tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Quiz Cần Thơ II">
+  <meta name="apple-touch-fullscreen" content="yes">
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="logo.png">
+  
+  <!-- Android specific meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Quiz Cần Thơ II">
+  <meta name="msapplication-TileColor" content="#800020">
+  <meta name="msapplication-tap-highlight" content="no">
+  
+  <!-- Android Chrome specific -->
+  <meta name="theme-color" content="#800020" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#800020" media="(prefers-color-scheme: dark)">
+  
+  <!-- Manifest and icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="logo.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="logo.png">
+  <style>
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* iPhone specific optimizations */
+    @supports (-webkit-touch-callout: none) {
+      body {
+        -webkit-font-smoothing: antialiased;
+        -webkit-text-size-adjust: 100%;
+      }
+      
+      input, select, textarea {
+        -webkit-appearance: none;
+        border-radius: 0;
+      }
+      
+      button {
+        -webkit-appearance: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    }
+    
+    /* Android specific optimizations */
+    @supports not (-webkit-touch-callout: none) {
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+      
+      input, select, textarea {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border-radius: 8px;
+      }
+      
+      button {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        -webkit-tap-highlight-color: transparent;
+        -moz-tap-highlight-color: transparent;
+        tap-highlight-color: transparent;
+      }
+      
+      /* Android Chrome specific optimizations */
+      .container {
+        -webkit-overflow-scrolling: touch;
+        overflow-scrolling: touch;
+      }
+      
+      /* Better touch targets for Android */
+      .btn, .answer, .topic-card {
+        min-height: 48px;
+        min-width: 48px;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -18,6 +103,10 @@
       <div class="logo">
         <img src="logo.png" alt="Logo" id="logo-img">
         <div class="logo-text">
+          <h1>Hệ thống ôn luyện trắc nghiệm</h1>
+          <p>Chi nhánh Cần Thơ II</p>
+        </div>
+      </div>
     </header>
 
     <div class="content">
@@ -96,6 +185,12 @@
         <button id="clear-storage-btn" type="button" class="btn btn-outline" style="margin-left:8px">
           <i class="material-icons">delete_sweep</i> Xóa bộ nhớ (local/session)
         </button>
+        <button id="refresh-data-btn" type="button" class="btn btn-outline" style="margin-left:8px">
+          <i class="material-icons">refresh</i> Tải lại dữ liệu
+        </button>
+        <button id="debug-btn" type="button" class="btn btn-outline" style="margin-left:8px">
+          <i class="material-icons">bug_report</i> Debug
+        </button>
       </div>
     </div>
 
@@ -111,12 +206,74 @@
         const examStartBtn = document.getElementById('exam-start-btn');
         const clearCookiesBtn = document.getElementById('clear-cookies-btn');
         const clearStorageBtn = document.getElementById('clear-storage-btn');
+        const refreshDataBtn = document.getElementById('refresh-data-btn');
+        const debugBtn = document.getElementById('debug-btn');
 
         function showEmptyState() {
           topicSelect.innerHTML = '<option value="">-- Chưa có chuyên đề --</option>';
           examSelect.innerHTML = '<option value="">-- Chưa có bài thi --</option>';
           topicInfo.style.display = 'none';
           examInfo.style.display = 'none';
+          
+          // Show error message
+          const errorMsg = document.createElement('div');
+          errorMsg.id = 'loading-error';
+          errorMsg.style.cssText = `
+            background: #ffebee;
+            color: #c62828;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            border-left: 4px solid #f44336;
+            text-align: center;
+          `;
+          errorMsg.innerHTML = `
+            <i class="material-icons" style="vertical-align: middle; margin-right: 8px;">error</i>
+            Không thể tải dữ liệu. Vui lòng thử các cách sau:
+            <br><br>
+            <strong>Cách 1:</strong> Nhấn nút "Tải lại dữ liệu" bên dưới
+            <br><strong>Cách 2:</strong> Kiểm tra kết nối mạng và tải lại trang
+            <br><strong>Cách 3:</strong> Xóa cache trình duyệt (Ctrl+F5)
+            <br><br>
+            <small>Nếu vẫn không được, liên hệ quản trị viên: trungnguyenthanh1@agribank.com.vn</small>
+          `;
+          
+          const container = document.querySelector('.content');
+          const existingError = document.getElementById('loading-error');
+          if (existingError) {
+            existingError.remove();
+          }
+          container.insertBefore(errorMsg, container.firstChild);
+        }
+        
+        function showLoadingState() {
+          const loadingMsg = document.createElement('div');
+          loadingMsg.id = 'loading-indicator';
+          loadingMsg.style.cssText = `
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            border-left: 4px solid #2196f3;
+            text-align: center;
+          `;
+          loadingMsg.innerHTML = `
+            <i class="material-icons" style="vertical-align: middle; margin-right: 8px; animation: spin 1s linear infinite;">refresh</i>
+            Đang tải dữ liệu...
+          `;
+          
+          const container = document.querySelector('.content');
+          const existingLoading = document.getElementById('loading-indicator');
+          const existingError = document.getElementById('loading-error');
+          if (existingLoading) existingLoading.remove();
+          if (existingError) existingError.remove();
+          container.insertBefore(loadingMsg, container.firstChild);
+        }
+        
+        function hideLoadingState() {
+          const loading = document.getElementById('loading-indicator');
+          if (loading) loading.remove();
         }
 
         function clearAllCookies() {
@@ -163,6 +320,80 @@
 
         if (clearStorageBtn) {
           clearStorageBtn.addEventListener('click', clearWebStorage);
+        }
+
+        if (refreshDataBtn) {
+          refreshDataBtn.addEventListener('click', function() {
+            // Clear cached data and reload
+            localStorage.removeItem('quiz_topics');
+            loadTopics();
+          });
+        }
+
+        if (debugBtn) {
+          debugBtn.addEventListener('click', function() {
+            // Show debug information
+            const debugInfo = {
+              userAgent: navigator.userAgent,
+              location: window.location.href,
+              localStorage: {
+                hasQuizTopics: !!localStorage.getItem('quiz_topics'),
+                topicsCount: JSON.parse(localStorage.getItem('quiz_topics') || '[]').length
+              },
+              network: navigator.onLine ? 'Online' : 'Offline',
+              screen: {
+                width: window.screen.width,
+                height: window.screen.height,
+                availWidth: window.screen.availWidth,
+                availHeight: window.screen.availHeight
+              },
+              viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+              }
+            };
+            
+            const debugModal = document.createElement('div');
+            debugModal.style.cssText = `
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0,0,0,0.8);
+              z-index: 10000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            `;
+            
+            debugModal.innerHTML = `
+              <div style="
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                max-width: 90vw;
+                max-height: 90vh;
+                overflow-y: auto;
+                font-family: monospace;
+                font-size: 12px;
+              ">
+                <h3>Debug Information</h3>
+                <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+                <button onclick="this.closest('div').parentElement.remove()" style="
+                  background: #800020;
+                  color: white;
+                  border: none;
+                  padding: 10px 20px;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  margin-top: 10px;
+                ">Đóng</button>
+              </div>
+            `;
+            
+            document.body.appendChild(debugModal);
+          });
         }
 
         function renderLists(all) {
@@ -378,28 +609,90 @@
         });
 
         async function loadTopics() {
-          const localTopics = JSON.parse(localStorage.getItem('quiz_topics') || '[]');
-          if (localTopics.length > 0) {
-            renderLists(localTopics);
-            return;
-          }
+          console.log('Loading topics...');
+          showLoadingState();
+          
+          // Try to load from localStorage first
           try {
-            // Dùng đường dẫn tương đối + cache-busting để tránh CDN trả bản cũ
-            const url = new URL('./topics.json', location.href);
-            url.searchParams.set('v', Date.now());
-            const resp = await fetch(url, { cache: 'no-store' });
-            if (resp.ok) {
-              const remoteTopics = await resp.json();
-              if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
-                localStorage.setItem('quiz_topics', JSON.stringify(remoteTopics));
-                renderLists(remoteTopics);
+            const localTopicsStr = localStorage.getItem('quiz_topics');
+            if (localTopicsStr) {
+              const localTopics = JSON.parse(localTopicsStr);
+              if (Array.isArray(localTopics) && localTopics.length > 0) {
+                console.log('Loaded topics from localStorage:', localTopics.length);
+                hideLoadingState();
+                renderLists(localTopics);
                 return;
               }
             }
-            showEmptyState();
-          } catch(e) {
-            showEmptyState();
+          } catch (e) {
+            console.warn('Error loading from localStorage:', e);
+            localStorage.removeItem('quiz_topics'); // Clear corrupted data
           }
+          
+          // Try to load from remote with multiple fallback strategies
+          const urls = [
+            './topics.json',
+            'topics.json',
+            window.location.origin + '/topics.json',
+            window.location.href.replace(/\/[^\/]*$/, '/topics.json')
+          ];
+          
+          for (const urlString of urls) {
+            try {
+              console.log('Trying to load from:', urlString);
+              const url = new URL(urlString, location.href);
+              url.searchParams.set('v', Date.now());
+              
+              const resp = await fetch(url, { 
+                cache: 'no-store',
+                headers: {
+                  'Accept': 'application/json'
+                }
+              });
+              
+              console.log('Fetch response status:', resp.status, 'for URL:', urlString);
+              
+              if (resp.ok) {
+                const remoteTopics = await resp.json();
+                console.log('Remote topics loaded:', remoteTopics);
+                
+                if (Array.isArray(remoteTopics) && remoteTopics.length > 0) {
+                  // Validate topic structure
+                  const validTopics = remoteTopics.filter(topic => 
+                    topic && 
+                    typeof topic.id === 'string' && 
+                    typeof topic.name === 'string' &&
+                    Array.isArray(topic.questions)
+                  );
+                  
+                  if (validTopics.length > 0) {
+                    try {
+                      localStorage.setItem('quiz_topics', JSON.stringify(validTopics));
+                      console.log('Valid topics saved to localStorage:', validTopics.length);
+                    } catch (storageError) {
+                      console.warn('Could not save to localStorage:', storageError);
+                    }
+                    hideLoadingState();
+                    renderLists(validTopics);
+                    return;
+                  } else {
+                    console.warn('No valid topics found in remote data');
+                  }
+                } else {
+                  console.warn('Remote topics is not a valid array or is empty');
+                }
+              } else {
+                console.error('Failed to fetch from', urlString, ':', resp.status, resp.statusText);
+              }
+            } catch(e) {
+              console.error('Error loading from', urlString, ':', e);
+            }
+          }
+          
+          // Show empty state if all methods fail
+          console.log('All loading methods failed, showing empty state');
+          hideLoadingState();
+          showEmptyState();
         }
 
         loadTopics();
@@ -416,5 +709,16 @@
   </footer>
   
   <script src="mobile-touch.js"></script>
+  
+  <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registered'))
+          .catch(err => console.log('Service Worker registration failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>

@@ -8,6 +8,17 @@
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     document.body.classList.add('touch-device');
   }
+  
+  // Detect Android devices
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const isChrome = /Chrome/i.test(navigator.userAgent);
+  const isWebView = /wv/i.test(navigator.userAgent);
+  
+  if (isAndroid) {
+    document.body.classList.add('android-device');
+    if (isChrome) document.body.classList.add('android-chrome');
+    if (isWebView) document.body.classList.add('android-webview');
+  }
 
   // Prevent zoom on double tap for buttons and interactive elements
   let lastTouchEnd = 0;
@@ -27,6 +38,11 @@
         this.classList.add('touch-active');
         this.style.transform = 'scale(0.95)';
         this.style.transition = 'transform 0.1s ease';
+        
+        // Android specific haptic feedback
+        if (isAndroid && 'vibrate' in navigator) {
+          navigator.vibrate(10);
+        }
       });
       
       element.addEventListener('touchend', function() {
@@ -160,13 +176,29 @@
     // Optimize form inputs for mobile
     const inputs = document.querySelectorAll('input, select, textarea');
     inputs.forEach(input => {
-      // Prevent zoom on focus for iOS
+      // Prevent zoom on focus for iOS and Android
       if (input.type === 'text' || input.type === 'email' || input.type === 'password' || input.type === 'number') {
         input.addEventListener('focus', function() {
           if (window.innerWidth < 768) {
             this.style.fontSize = '16px';
           }
+          
+          // Android specific optimizations
+          if (isAndroid) {
+            // Scroll input into view on Android
+            setTimeout(() => {
+              this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+          }
         });
+        
+        // Android keyboard handling
+        if (isAndroid) {
+          input.addEventListener('blur', function() {
+            // Handle keyboard dismissal
+            window.scrollTo(0, 0);
+          });
+        }
       }
     });
     
@@ -244,6 +276,43 @@
     /* Smooth transitions for touch interactions */
     .touch-device * {
       transition: transform 0.1s ease, opacity 0.1s ease;
+    }
+    
+    /* Android specific styles */
+    .android-device .btn:active,
+    .android-device .answer:active,
+    .android-device .topic-card:active {
+      background-color: rgba(128, 0, 32, 0.1);
+      transform: scale(0.98);
+      transition: all 0.1s ease;
+    }
+    
+    /* Android Chrome optimizations */
+    .android-chrome .container {
+      -webkit-overflow-scrolling: touch;
+      overflow-scrolling: touch;
+    }
+    
+    .android-chrome .btn,
+    .android-chrome .answer,
+    .android-chrome .topic-card {
+      -webkit-tap-highlight-color: transparent;
+      -moz-tap-highlight-color: transparent;
+      tap-highlight-color: transparent;
+    }
+    
+    /* Android WebView optimizations */
+    .android-webview body {
+      -webkit-overflow-scrolling: touch;
+      overflow-scrolling: touch;
+    }
+    
+    .android-webview input,
+    .android-webview select,
+    .android-webview textarea {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
     }
   `;
   document.head.appendChild(style);

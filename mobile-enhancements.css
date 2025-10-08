@@ -1,6 +1,77 @@
 /* Mobile Enhancements for Quiz App */
 /* Optimized for touch devices and small screens */
 
+/* iPhone specific optimizations */
+@supports (-webkit-touch-callout: none) {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  body {
+    -webkit-overflow-scrolling: touch;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+  
+  input, select, textarea, button {
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Android specific optimizations */
+@supports not (-webkit-touch-callout: none) {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  body {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+  
+  input, select, textarea, button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 8px;
+  }
+  
+  button {
+    -webkit-tap-highlight-color: transparent;
+    -moz-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
+  }
+  
+  /* Android Chrome specific optimizations */
+  .container {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+  
+  /* Better touch targets for Android */
+  .btn, .answer, .topic-card {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  /* Android WebView optimizations */
+  input:focus, select:focus, textarea:focus {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+  }
+}
+
 /* Mobile-first approach */
 * {
   -webkit-tap-highlight-color: transparent;
@@ -60,6 +131,10 @@ input, textarea, select {
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transition: all 0.2s ease;
+    /* Android specific optimizations */
+    -webkit-tap-highlight-color: transparent;
+    -moz-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
   }
 
   .btn:hover, .btn:active {
@@ -85,6 +160,13 @@ input, textarea, select {
     border-radius: 12px !important;
     border-width: 2px !important;
     transition: all 0.2s ease;
+    /* Android specific optimizations */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    -moz-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
   }
 
   input:focus,
@@ -715,6 +797,107 @@ input, textarea, select {
     .topic-card:hover {
       transform: translateY(-4px) !important;
       box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+    }
+  }
+}
+
+/* Android specific optimizations */
+@supports not (-webkit-touch-callout: none) {
+  /* Android Chrome and WebView optimizations */
+  .container {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Better scrolling on Android */
+  body {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+  
+  /* Android touch feedback */
+  .btn:active,
+  .answer:active,
+  .topic-card:active {
+    background-color: rgba(128, 0, 32, 0.1);
+    transform: scale(0.98);
+    transition: all 0.1s ease;
+  }
+  
+  /* Android form optimizations */
+  input:focus,
+  select:focus,
+  textarea:focus {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+    background-color: rgba(128, 0, 32, 0.05);
+  }
+  
+  /* Android keyboard handling */
+  @media (max-width: 768px) {
+    .container {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    
+    /* Prevent zoom on input focus for Android */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+  
+  /* Android Chrome address bar handling */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .container {
+      padding: 8px !important;
+    }
+    
+    .welcome-section {
+      padding: 8px 0 !important;
+      margin-bottom: 8px !important;
+    }
+    
+    .quiz-controls {
+      margin: 8px 0 !important;
+      padding: 8px 0 !important;
+    }
+  }
+  
+  /* Android performance optimizations */
+  .btn,
+  .answer,
+  .topic-card,
+  .modal-content {
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-perspective: 1000;
+    perspective: 1000;
+  }
+  
+  /* Android specific animations */
+  @media (prefers-reduced-motion: no-preference) {
+    .btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+    
+    .answer:hover {
+      transform: translateY(-1px) scale(1.01);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .topic-card:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.15);
     }
   }
 }

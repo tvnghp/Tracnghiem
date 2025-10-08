@@ -1,20 +1,56 @@
 {
-  "name": "Quiz Cần Thơ II - Hệ thống ôn luyện trắc nghiệm",
-  "short_name": "Quiz CT2",
-  "description": "Hệ thống ôn luyện trắc nghiệm Chi nhánh Cần Thơ II - Agribank. Ứng dụng giúp nhân viên ôn tập và kiểm tra kiến thức chuyên môn.",
-  "start_url": "./index.html",
-  "scope": "./",
+  "name": "Hệ thống ôn luyện trắc nghiệm Cần Thơ II",
+  "short_name": "Quiz Cần Thơ II",
+  "description": "Hệ thống ôn luyện trắc nghiệm cho Chi nhánh Cần Thơ II",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#800020",
-  "orientation": "any",
-  "id": "vn.agribank.cantho2.quiz",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "id": "quiz-cantho-ii",
   "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "logo.png",
@@ -26,5 +62,11 @@
   "categories": ["education", "productivity"],
   "lang": "vi",
   "dir": "ltr",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
