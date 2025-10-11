@@ -10,8 +10,8 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   
-  <link rel="stylesheet" href="styles.css?v=20250111">
-  <link rel="stylesheet" href="mobile-enhancements.css?v=20250111">
+  <link rel="stylesheet" href="styles.css?v=20250112">
+  <link rel="stylesheet" href="mobile-enhancements.css?v=20250112">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   
   <!-- Theme and PWA meta tags -->
@@ -42,9 +42,9 @@
   <link rel="icon" type="image/png" sizes="192x192" href="logo.png">
   <link rel="icon" type="image/png" sizes="512x512" href="logo.png">
   <!-- Config file -->
-  <script src="config.js?v=20250111"></script>
-  <script src="indexeddb-storage.js?v=20250111"></script>
-  <script src="storage-wrapper.js?v=20250111"></script>
+  <script src="config.js?v=20250112"></script>
+  <script src="indexeddb-storage.js?v=20250112"></script>
+  <script src="storage-wrapper.js?v=20250112"></script>
   <style>
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -4117,7 +4117,9 @@
       <div style="display: flex !important; justify-content: space-between !important; flex-wrap: wrap !important; gap: 20px !important; margin-bottom: 12px !important;">
         <div style="flex: 1 !important; min-width: 250px !important;">
           <div style="display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 8px !important;">
-            <img src="logo.png" alt="Logo" style="width: 40px !important; height: 40px !important; object-fit: contain !important; background: rgba(255,255,255,0.1) !important; border-radius: 4px !important; padding: 2px !important;" onerror="console.error('Footer logo load failed:', this.src); this.style.display='none';">
+            <div style="width: 35px !important; height: 35px !important; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important; border-radius: 8px !important; padding: 2px !important; border: 2px solid rgba(255,255,255,0.9) !important; box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.8) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.3s ease !important; position: relative !important; overflow: hidden !important;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.9)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 3px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.8)'">
+              <img src="logo-new.png?v=20250112" alt="Logo Agribank" style="width: 100% !important; height: 100% !important; object-fit: contain !important; filter: none !important; -webkit-filter: none !important; -moz-filter: none !important; -ms-filter: none !important; -o-filter: none !important; transition: all 0.3s ease !important;" onerror="console.error('Logo load failed:', this.src); this.style.display='none';">
+            </div>
             <div>
               <h3 style="font-size: 0.9em !important; margin: 0 0 2px !important; color: #fff !important; font-weight: 600 !important;">Hệ thống ôn luyện trắc nghiệm</h3>
               <p style="margin: 0 !important; color: rgba(255, 255, 255, 0.8) !important; font-size: 0.75em !important;">Chi nhánh Cần Thơ II</p>
@@ -4146,7 +4148,7 @@
     <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #800020;"></div>
   </footer>
   
-  <script src="mobile-touch.js?v=20250111"></script>
+  <script src="mobile-touch.js?v=20250112"></script>
   
   <script>
     // Register Service Worker with auto-update
