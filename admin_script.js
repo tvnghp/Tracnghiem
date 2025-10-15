@@ -101,12 +101,75 @@ function showLoginForm() {
 }
 
 async function getTopics() {
-  const topicsJson = await window.quizStorage.getTopics();
-  return JSON.parse(topicsJson || '[]');
+  try {
+    if (!window.quizStorage) {
+      console.error('❌ window.quizStorage not available');
+      return [];
+    }
+    
+    console.log('🔍 Getting topics from quizStorage...');
+    const topicsJson = await window.quizStorage.getTopics();
+    console.log('📊 Topics JSON:', topicsJson ? 'Found data' : 'No data');
+    
+    const topics = JSON.parse(topicsJson || '[]');
+    console.log('✅ Parsed topics:', topics.length, 'items');
+    return topics;
+  } catch (error) {
+    console.error('❌ Error getting topics:', error);
+    return [];
+  }
 }
 
 async function saveTopics(topics) {
   await window.quizStorage.saveTopics(topics);
+}
+
+async function checkAndInitializeData() {
+  console.log('🔍 Checking and initializing data...');
+  
+  try {
+    // Check if we have any topics in IndexedDB
+    const topics = await getTopics();
+    console.log('📊 Current topics in IndexedDB:', topics.length);
+    
+    if (topics.length === 0) {
+      console.log('⚠️ No topics found, trying to load from topics.json...');
+      
+      // Try to load from topics.json file
+      try {
+        const response = await fetch('./topics.json');
+        if (response.ok) {
+          const topicsData = await response.json();
+          console.log('✅ Loaded topics from topics.json:', topicsData.length);
+          
+          if (topicsData.length > 0) {
+            // Save to IndexedDB
+            await saveTopics(topicsData);
+            console.log('✅ Saved topics to IndexedDB');
+            
+            // Show success message
+            const msgEl = document.getElementById('topic-msg');
+            if (msgEl) {
+              msgEl.textContent = `Đã tải ${topicsData.length} chuyên đề từ topics.json`;
+              msgEl.className = 'ml-2 success';
+              setTimeout(() => {
+                msgEl.textContent = '';
+                msgEl.className = '';
+              }, 3000);
+            }
+          }
+        } else {
+          console.error('❌ Failed to fetch topics.json:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ Error loading topics.json:', error);
+      }
+    } else {
+      console.log('✅ Topics already exist in IndexedDB');
+    }
+  } catch (error) {
+    console.error('❌ Error checking/initializing data:', error);
+  }
 }
 
 function uuid() {
@@ -214,12 +277,16 @@ function parseExcelFile(file, callback) {
 }
 
 async function renderTopics() {
+  console.log('🎨 Starting renderTopics...');
   const topics = await getTopics();
+  console.log('📋 Topics to render:', topics.length);
+  
   const selector = document.getElementById('topic-selector');
   const detailContainer = document.getElementById('topic-detail-container');
   const gridContainer = document.getElementById('topic-list-container');
   
   if (topics.length === 0) {
+    console.log('⚠️ No topics found, showing empty state');
     selector.innerHTML = '<option value="">-- Chưa có chuyên đề --</option>';
     detailContainer.style.display = 'none';
     if (gridContainer) gridContainer.innerHTML = '<div class="empty-state"><i class="material-icons">folder_open</i><p>Chưa có chuyên đề nào</p></div>';
@@ -1630,6 +1697,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   // Wait for quizStorage to exist
+  console.log('🔍 Waiting for quizStorage...');
   retries = 50;
   while (!window.quizStorage && retries > 0) {
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -1642,15 +1710,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     return;
   }
   
+  console.log('✅ quizStorage is ready');
+  
   const isAuth = await checkAuth();
   if (isAuth) {
     showAdminPanel();
     initializeViews();
     
-    // Initialize topic management
-    const topics = await getTopics();
-    renderTopicDropdown(topics);
-    renderTopicGrid(topics);
+    // Check and initialize data if needed
+    await checkAndInitializeData();
+    
+    // Render topics after data initialization
+    await renderTopics();
     
     // Add new topic button
     const addTopicBtn = document.getElementById('add-topic-btn');
@@ -1898,6 +1969,13 @@ document.addEventListener('DOMContentLoaded', async function() {
   const testGoogleSheetsBtn = document.getElementById('test-google-sheets-btn');
   if (testGoogleSheetsBtn) testGoogleSheetsBtn.addEventListener('click', async function() {
     await testGoogleSheetsConnection();
+  });
+  
+  // Load topics button
+  const loadTopicsBtn = document.getElementById('load-topics-btn');
+  if (loadTopicsBtn) loadTopicsBtn.addEventListener('click', async function() {
+    await checkAndInitializeData();
+    await renderTopics();
   });
   
   // Merge JSON files
