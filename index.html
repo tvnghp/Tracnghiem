@@ -1575,34 +1575,46 @@
           const topics = filtered.filter(t => !(t && (t.isExam === true || (typeof t.durationMinutes === 'number' && t.durationMinutes > 0))));
 
           // Sort topics by name (extract number prefix for proper ordering)
-          const sortTopics = (topics) => {
-            return topics.sort((a, b) => {
-              // Extract number prefix (e.g., "1. Tín dụng..." -> 1)
-              const getNumber = (name) => {
-                const match = name.match(/^(\d+)\./);
-                return match ? parseInt(match[1]) : 999;
-              };
-              
-              const numA = getNumber(a.name);
-              const numB = getNumber(b.name);
-              
-              // If both have numbers, sort by number
-              if (numA !== 999 && numB !== 999) {
-                return numA - numB;
-              }
-              
-              // If only one has number, number comes first
-              if (numA !== 999) return -1;
-              if (numB !== 999) return 1;
-              
-              // If neither has number, sort alphabetically
-              return a.name.localeCompare(b.name, 'vi');
+          const sortTopics = (items) => {
+            const getNumber = (name) => {
+              const match = name && name.match(/^(\d+)\./);
+              return match ? parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+            };
+            return items.sort((a, b) => {
+              const numA = getNumber(a?.name || '');
+              const numB = getNumber(b?.name || '');
+              if (numA !== numB) return numA - numB;
+              return (a?.name || '').localeCompare(b?.name || '', 'vi');
+            });
+          };
+
+          // Dedicated sort for exams: number prefix, then exam type priority, then name
+          const sortExams = (items) => {
+            const getNumber = (name) => {
+              const match = name && name.match(/^(\d+)\./);
+              return match ? parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+            };
+            const getExamPriority = (name) => {
+              const n = (name || '').toLowerCase();
+              // ưu tiên chức danh chức vụ trước, sau đó lao động CMNV, còn lại cuối
+              if (n.includes('chức danh chức vụ')) return 0;
+              if (n.includes('lao động chuyên môn nghiệp vụ')) return 1;
+              return 2;
+            };
+            return items.sort((a, b) => {
+              const numA = getNumber(a?.name || '');
+              const numB = getNumber(b?.name || '');
+              if (numA !== numB) return numA - numB;
+              const prA = getExamPriority(a?.name);
+              const prB = getExamPriority(b?.name);
+              if (prA !== prB) return prA - prB;
+              return (a?.name || '').localeCompare(b?.name || '', 'vi');
             });
           };
 
           // Sort both topics and exams
           const sortedTopics = sortTopics([...topics]);
-          const sortedExams = sortTopics([...exams]);
+          const sortedExams = sortExams([...exams]);
 
           // Populate topic dropdown
           if (sortedTopics.length > 0) {
