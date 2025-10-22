@@ -418,6 +418,7 @@
       width: 280px;
       right: -280px;
     }
+ 
     
     .sidebar-toggle-btn {
       right: 10px;
@@ -900,26 +901,89 @@ function scrollToQuestion() {
       return array;
     }
 
+    // Helpers for multi-correct handling
+    function getCorrectLabels(question) {
+      if (!question) return [];
+      const labels = (question.optionLabels || []).slice(); // e.g., ["A","B","C","D"]
+      const pickLabel = (token) => {
+        if (!token) return null;
+        const t = String(token).replace(/[\u00A0\s]+/g, '').trim();
+        if (!t) return null;
+        // Support combined like "A/1" or "c/3": split by '/'
+        const parts = t.split('/').map(p => p.trim()).filter(Boolean);
+        let letter = null;
+        let number = null;
+        parts.forEach(p => {
+          const mNum = p.match(/^\d+$/);
+          if (mNum) number = parseInt(p, 10);
+          const mLet = p.match(/^[A-Za-z]$/);
+          if (mLet) letter = mLet[0].toUpperCase();
+        });
+        if (letter && labels.includes(letter)) return letter;
+        if (number && number >= 1 && number <= labels.length) return labels[number - 1];
+        // If token is just a letter or number (no slash)
+        const tUpper = t.toUpperCase();
+        if (/^[A-D]$/.test(tUpper)) return tUpper;
+        const asNum = parseInt(t, 10);
+        if (!Number.isNaN(asNum) && asNum >= 1 && asNum <= labels.length) return labels[asNum - 1];
+        return null;
+      };
+
+      const ans = question.answer;
+      let tokens = [];
+      if (Array.isArray(ans)) tokens = ans;
+      else if (typeof ans === 'string') {
+        // If cell contains descriptive text then ';' followed by codes, take part after last ';'
+        let s = ans;
+        if (s.includes(';')) s = s.substring(s.lastIndexOf(';') + 1);
+        // Normalize separators: comma, fullwidth comma, ideographic comma, semicolon
+        const seps = /[\,\uFF0C；;、]/g;
+        tokens = s.split(seps).map(x => x).filter(Boolean);
+      } else return [];
+      const mapped = tokens.map(pickLabel).filter(Boolean);
+      // De-duplicate
+      return Array.from(new Set(mapped));
+    }
+
+    function isMulti(question) {
+      const labels = getCorrectLabels(question);
+      return labels.length > 1;
+    }
+
+    function setsEqual(a, b) {
+      if (a.length !== b.length) return false;
+      const sa = new Set(a);
+      for (const x of b) if (!sa.has(x)) return false;
+      return true;
+    }
+
     function shuffleOptions(question) {
       const letterPool = ["A", "B", "C", "D"];
       const pairs = (question.optionLabels || []).map((label, idx) => ({
         label: label,
         text: question.options[idx]
       }));
-      // determine correct option text before shuffling
-      const correctIndex = (question.optionLabels || []).indexOf(question.answer);
-      const correctText = correctIndex >= 0 ? question.options[correctIndex] : null;
+      // determine correct option texts before shuffling (support multi)
+      const originalLabels = (question.optionLabels || []).slice();
+      const correctLabels = getCorrectLabels(question);
+      const correctTexts = correctLabels
+        .map(lbl => {
+          const idx = originalLabels.indexOf(lbl);
+          return idx >= 0 ? question.options[idx] : null;
+        })
+        .filter(t => t !== null);
       shuffleArray(pairs);
       // reassign labels A..D in new order and options accordingly
       question.optionLabels = pairs.map((_, idx) => letterPool[idx]);
       question.options = pairs.map(p => p.text);
-      // set new correct label by matching text
-      if (correctText !== null) {
-        const newIndex = question.options.findIndex(t => t === correctText);
-        if (newIndex >= 0) {
-          question.answer = question.optionLabels[newIndex];
-        }
-      }
+      // set new correct label(s) by matching text
+      const newCorrectLabels = [];
+      correctTexts.forEach(ct => {
+        const newIndex = question.options.findIndex(t => t === ct);
+        if (newIndex >= 0) newCorrectLabels.push(question.optionLabels[newIndex]);
+      });
+      if (newCorrectLabels.length > 1) question.answer = newCorrectLabels;
+      else if (newCorrectLabels.length === 1) question.answer = newCorrectLabels[0];
     }
 
     function shuffleQuestionsAndOptions() {
@@ -1539,6 +1603,22 @@ async function continueInitQuiz() {
       // Update question text - with safety check
       if (questionEl && question) {
         questionEl.textContent = question.question;
+        // Add or update hint under question about single/multi select
+        let hintEl = document.getElementById('question-hint');
+        if (!hintEl) {
+          hintEl = document.createElement('div');
+          hintEl.id = 'question-hint';
+          hintEl.className = 'question-hint';
+          questionEl.insertAdjacentElement('afterend', hintEl);
+        }
+        const multi = isMulti(question);
+        const multiHint = multi ? '(Câu hỏi chọn nhiều đáp án)' : '(Câu hỏi chọn 1 đáp án)';
+        const ua = userAnswers[index] || {};
+        const answeredHint = Array.isArray(ua.answer) ? ua.answer.length > 0 : ua.answer != null;
+        const statusHtml = answeredHint
+          ? (ua.correct ? '<span class="status-correct">ĐÃ CHỌN: ĐÚNG</span>' : '<span class="status-incorrect">ĐÃ CHỌN: SAI</span>')
+          : '';
+        hintEl.innerHTML = `${multiHint} ${statusHtml ? '• ' + statusHtml : ''}`;
       } else {
         console.error('questionEl or question is null:', { questionEl, question });
       }
@@ -1553,25 +1633,66 @@ async function continueInitQuiz() {
           question.optionLabels.forEach((label, i) => {
             const answer = question.options[i];
             const answerEl = document.createElement('div');
-            const isSelected = userAnswer.answer === label;
-            const isCorrect = label === question.answer;
-            const reveal = quizSubmitted || userAnswer.answer !== null;
+            const multi = isMulti(question);
+            const correctLabels = getCorrectLabels(question);
+            const isSelected = multi
+              ? Array.isArray(userAnswer.answer) && userAnswer.answer.includes(label)
+              : userAnswer.answer === label;
+            const isCorrect = correctLabels.includes(label);
+            const hasAnswer = Array.isArray(userAnswer.answer) ? userAnswer.answer.length > 0 : userAnswer.answer != null;
+            const reveal = quizSubmitted || hasAnswer;
             
             let answerClass = 'answer';
             if (isSelected) answerClass += ' selected';
             if (reveal) {
-              if (isCorrect) answerClass += ' correct';
+              // Coloring rules:
+              // - After submit: show all correct options
+              // - Before submit:
+              //    * Multi-choice: only color selected-correct as green
+              //    * Single-choice: show the correct option as green even if not selected
+              let markCorrect = false;
+              if (quizSubmitted) markCorrect = isCorrect;
+              else if (multi) markCorrect = isSelected && isCorrect;
+              else markCorrect = isCorrect; // single-choice
+              if (markCorrect) answerClass += ' correct';
               if (isSelected && !isCorrect) answerClass += ' incorrect';
             }
             
             answerEl.className = answerClass;
+            const inputType = multi ? 'checkbox' : 'radio';
+            const checkedAttr = isSelected ? 'checked' : '';
+            const disabledAttr = quizSubmitted ? 'disabled' : '';
+            const inputName = `answer-group-q-${index}`; // unique per question
             answerEl.innerHTML = `
+              <input type="${inputType}" class="answer-input" name="${inputName}" ${checkedAttr} ${disabledAttr} />
               <span class="option">${label}.</span>
               <span class="text">${answer}</span>
             `;
             
             if (!quizSubmitted) {
-              answerEl.onclick = () => selectAnswer(label);
+              const inputEl = answerEl.querySelector('.answer-input');
+              answerEl.onclick = (e) => {
+                // When clicking the row, also toggle the input for immediate visual feedback
+                if (multi) {
+                  if (inputEl) inputEl.checked = !inputEl.checked;
+                  window.toggleMultiAnswer(label);
+                } else {
+                  // For radio, uncheck others and check this one
+                  if (inputEl) {
+                    const group = document.querySelectorAll(`input.answer-input[name='${inputName}']`);
+                    group.forEach(inp => { inp.checked = false; });
+                    inputEl.checked = true;
+                  }
+                  window.selectAnswer(label);
+                }
+              };
+              if (inputEl) {
+                inputEl.addEventListener('change', (e) => {
+                  e.stopPropagation();
+                  if (multi) window.toggleMultiAnswer(label);
+                  else window.selectAnswer(label);
+                });
+              }
             }
             
             answersEl.appendChild(answerEl);
@@ -1597,7 +1718,14 @@ async function continueInitQuiz() {
       updateNavigation();
       updateProgress();
 // ... cuối showQuestion(index):
-scrollToQuestion();
+if (window.forceFocusButtonOnce) {
+  // Bỏ qua focus về câu hỏi cho lần render này
+  window.forceFocusButtonOnce = false;
+} else if (window.suppressFocusUntilMs && Date.now() < window.suppressFocusUntilMs) {
+  // Bỏ qua focus về câu hỏi nếu đang trong khoảng thời gian suppress sau khi chọn đáp án
+} else {
+  scrollToQuestion();
+}
 updateNextBtnStatus();
 
 
@@ -1633,7 +1761,7 @@ updateNextBtnStatus();
       
       const questionItems = userAnswers.map((userAnswer, index) => {
         const isCurrent = index === currentQuestionIndex;
-        const isAnswered = userAnswer.answer !== null;
+        const isAnswered = Array.isArray(userAnswer.answer) ? userAnswer.answer.length > 0 : userAnswer.answer !== null;
         const isCorrect = userAnswer.correct === true;
         const isIncorrect = userAnswer.correct === false;
         const isFlagged = userAnswer.flagged;
@@ -1726,49 +1854,69 @@ updateNextBtnStatus();
       progressEl.style.width = `${progress}%`;
     }
 
-    function selectAnswer(answer) {
-      if (quizSubmitted || isPaused) return;
-      
-      const userAnswer = userAnswers[currentQuestionIndex];
-      userAnswer.answer = answer;
-      userAnswer.correct = answer === questions[currentQuestionIndex].answer;
-      
-      // Show explanation if available
-      const question = questions[currentQuestionIndex];
-      if (question.explain) {
-        showExplanation(question.explain);
-        userAnswer.explanationShown = true;
-      }
-      
-      // Update UI
-      showQuestion(currentQuestionIndex);
-      saveProgress();
-updateNextBtnStatus();
-
-requestAnimationFrame(() => {
-  const btn = document.getElementById('next-btn') || (typeof nextBtn !== 'undefined' ? nextBtn : null);
-  if (!btn) return;
-
-  // Cho phép focus tạm thời để .focus() không lỗi
-  if (!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex', '-1');
-
-  // Cuộn nút vào giữa màn hình
-  btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  // Đặt focus (không gây cuộn lại) và nháy nhẹ
-  btn.focus({ preventScroll: true });
-  btn.classList.add('pulse');
-  setTimeout(() => btn.classList.remove('pulse'), 600);
-});
-
-    }
-
     function showExplanation(text) {
       explanationEl.innerHTML = `
         <h4><i class="material-icons">info</i> Giải thích</h4>
         <p>${text}</p>
       `;
       explanationEl.style.display = 'block';
+    }
+
+    // Single-answer handler
+    window.selectAnswer = function(answer) {
+      if (quizSubmitted || isPaused) return;
+      const userAnswer = userAnswers[currentQuestionIndex];
+      const question = questions[currentQuestionIndex];
+      const correctLabels = getCorrectLabels(question);
+      userAnswer.answer = answer;
+      userAnswer.correct = correctLabels.length === 1 && answer === correctLabels[0];
+      if (question.explain) {
+        showExplanation(question.explain);
+        userAnswer.explanationShown = true;
+      }
+      // Tránh focus quay lại câu hỏi trong một khoảng ngắn sau khi cập nhật lựa chọn
+      window.suppressFocusUntilMs = Date.now() + 1200;
+      // Ép bỏ qua focus câu hỏi cho lần render kế tiếp và chuyển focus sang nút điều hướng
+      window.forceFocusButtonOnce = true;
+      showQuestion(currentQuestionIndex);
+      saveProgress();
+      updateNextBtnStatus();
+      // Sau khi chọn đáp án, focus sang nút Câu tiếp hoặc Nộp bài nếu là câu cuối
+      // Delay để đảm bảo DOM đã cập nhật xong
+      setTimeout(() => focusNextOrSubmit(), 100);
+    }
+
+    // Multi-answer handler (checkboxes)
+    window.toggleMultiAnswer = function(label) {
+      if (quizSubmitted || isPaused) return;
+      const userAnswer = userAnswers[currentQuestionIndex];
+      if (!Array.isArray(userAnswer.answer)) userAnswer.answer = [];
+      const idx = userAnswer.answer.indexOf(label);
+      if (idx >= 0) userAnswer.answer.splice(idx, 1); else userAnswer.answer.push(label);
+      const question = questions[currentQuestionIndex];
+      const correctLabels = getCorrectLabels(question);
+      userAnswer.correct = setsEqual([...userAnswer.answer].sort(), [...correctLabels].sort());
+      if (question.explain) {
+        showExplanation(question.explain);
+        userAnswer.explanationShown = true;
+      }
+      // Tránh focus quay lại câu hỏi trong một khoảng ngắn sau khi cập nhật lựa chọn
+      window.suppressFocusUntilMs = Date.now() + 400;
+      // Ép bỏ qua focus câu hỏi cho lần render này
+      window.forceFocusButtonOnce = true;
+      showQuestion(currentQuestionIndex);
+      saveProgress();
+      updateNextBtnStatus();
+      // Chỉ focus khi số lượng lựa chọn đã chọn bằng với số đáp án cần chọn của câu hỏi
+      try {
+        const neededCount = Array.isArray(correctLabels) ? correctLabels.length : 0;
+        const selectedCount = Array.isArray(userAnswer.answer) ? userAnswer.answer.length : 0;
+        const isMultiChoice = neededCount > 1; 
+        if (isMultiChoice && selectedCount === neededCount && selectedCount > 0) {
+          // Delay để đảm bảo DOM đã cập nhật xong
+          setTimeout(() => focusNextOrSubmit(), 100);
+        }
+      } catch(_) {}
     }
 
     function toggleFlag() {
@@ -1800,9 +1948,10 @@ requestAnimationFrame(() => {
           timestamp: new Date().toISOString()
         };
         
-        if (userAnswer.answer && !userAnswer.correct) {
+        const answered = Array.isArray(userAnswer.answer) ? userAnswer.answer.length > 0 : !!userAnswer.answer;
+        if (answered && !userAnswer.correct) {
           wrongAnswers.push(answerData);
-        } else if (userAnswer.answer && userAnswer.correct) {
+        } else if (answered && userAnswer.correct) {
           correctAnswers.push(answerData);
         }
       });
@@ -1987,7 +2136,8 @@ requestAnimationFrame(() => {
     }
 function getAnswerStatus(index){
   const ua = userAnswers?.[index];
-  if (!ua || ua.answer == null) return { text: "Chưa chọn", cls: "status-pending" };
+  const answered = !ua ? false : (Array.isArray(ua.answer) ? ua.answer.length > 0 : ua.answer != null);
+  if (!answered) return { text: "Chưa chọn", cls: "status-pending" };
   return ua.correct ? { text: "ĐÃ CHỌN: ĐÚNG", cls: "status-correct" }
                     : { text: "ĐÃ CHỌN: SAI",  cls: "status-incorrect" };
 }
@@ -1998,6 +2148,61 @@ function updateNextBtnStatus(){
   const st = getAnswerStatus(currentQuestionIndex);
   const base = `Câu tiếp <i class="material-icons">navigate_next</i>`;
   el.innerHTML = `${base} <span class="status-badge ${st.cls}">${st.text}</span>`;
+}
+
+function focusNextOrSubmit(){
+  try {
+    const byId = id => document.getElementById(id);
+    const isHidden = el => !el || el.offsetParent === null || getComputedStyle(el).display === 'none';
+    const isDisabled = el => !el || el.disabled === true;
+    const isLast = (typeof questions !== 'undefined' && Array.isArray(questions))
+      ? currentQuestionIndex === questions.length - 1
+      : false;
+
+    // Always resolve fresh elements from DOM
+    let nextEl = byId('next-btn');
+    let submitEl = byId('submit-quiz-btn');
+
+    console.log('focusNextOrSubmit called:', { isLast, nextEl, submitEl, nextHidden: isHidden(nextEl), nextDisabled: isDisabled(nextEl) });
+
+    // Decide preferred target
+    let target = null;
+    if (isLast || isHidden(nextEl) || isDisabled(nextEl)) {
+      target = submitEl;
+    } else {
+      target = nextEl;
+    }
+    
+    console.log('Focus target:', target);
+    if (!target) {
+      console.warn('No focus target found!');
+      return;
+    }
+
+    const doFocus = () => {
+      if (typeof target.focus === 'function') {
+        console.log('Focusing:', target.id || target);
+        try { 
+          // Cuộn nút vào tầm nhìn trước
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Sau đó focus (không cuộn thêm)
+          setTimeout(() => {
+            target.focus({ preventScroll: true }); 
+            console.log('Focus successful, activeElement:', document.activeElement);
+          }, 200);
+        } catch (_) { 
+          target.focus(); 
+          console.log('Focus fallback, activeElement:', document.activeElement);
+        }
+      }
+    };
+
+    // Execute focus immediately and with fallback
+    doFocus();
+    setTimeout(doFocus, 50);
+  } catch (e) {
+    console.error('focusNextOrSubmit error:', e);
+  }
 }
 
     function showResults() {
@@ -2407,17 +2612,25 @@ function updateNextBtnStatus(){
 
     function initEventListeners() {
       // Navigation
-      prevBtn.addEventListener('click', () => {
+      prevBtn.addEventListener('click', async () => {
         if (isPaused) return;
         if (currentQuestionIndex > 0) {
+          window.suppressFocusUntilMs = 0;
+          window.forceFocusButtonOnce = false;
           showQuestion(currentQuestionIndex - 1);
+          await saveProgress();
+          updateNextBtnStatus();
         }
       });
 
-      nextBtn.addEventListener('click', () => {
+      nextBtn.addEventListener('click', async () => {
         if (isPaused) return;
         if (currentQuestionIndex < questions.length - 1) {
+          window.suppressFocusUntilMs = 0;
+          window.forceFocusButtonOnce = false;
           showQuestion(currentQuestionIndex + 1);
+          await saveProgress();
+          updateNextBtnStatus();
         }
       });
 
@@ -2487,8 +2700,12 @@ function updateNextBtnStatus(){
       document.addEventListener('keydown', (e) => {
         if (isPaused) return;
         if (e.key === 'ArrowLeft' && currentQuestionIndex > 0) {
+          window.suppressFocusUntilMs = 0;
+          window.forceFocusButtonOnce = false;
           showQuestion(currentQuestionIndex - 1);
         } else if (e.key === 'ArrowRight' && currentQuestionIndex < questions.length - 1) {
+          window.suppressFocusUntilMs = 0;
+          window.forceFocusButtonOnce = false;
           showQuestion(currentQuestionIndex + 1);
         } else if (e.key === ' ' || e.key === 'Enter') {
           if (!e.target.matches('button, a, input, textarea')) {

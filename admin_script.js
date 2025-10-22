@@ -128,16 +128,54 @@ async function checkAndInitializeData() {
   console.log('🔍 Checking and initializing data...');
   
   try {
+    // Kiểm tra phiên bản dữ liệu để buộc tải lại khi có thay đổi
+    let shouldForceReload = false;
+    try {
+      const storedVersion = await window.db.getConfig('data_version');
+      const currentVersion = window.QUIZ_CONFIG?.DATA_VERSION || 1;
+      
+      if (storedVersion) {
+        const storedVer = parseInt(storedVersion);
+        if (storedVer < currentVersion) {
+          console.log(`⚠️ Phát hiện phiên bản dữ liệu mới: ${storedVer} → ${currentVersion}. Buộc tải lại...`);
+          shouldForceReload = true;
+          // Xóa cache cũ
+          await window.db.deleteConfig('quiz_topics');
+          await window.db.clearTopics();
+          console.log('✅ Đã xóa cache cũ');
+        }
+      } else {
+        // Lần đầu tiên hoặc chưa có version
+        shouldForceReload = true;
+      }
+    } catch (e) {
+      console.error('Error checking data version:', e);
+    }
+    
     // Check if we have any topics in IndexedDB
     const topics = await getTopics();
     console.log('📊 Current topics in IndexedDB:', topics.length);
     
-    if (topics.length === 0) {
-      console.log('⚠️ No topics found, trying to load from topics.json...');
+    if (topics.length === 0 || shouldForceReload) {
+      if (shouldForceReload) {
+        console.log('🔄 Bỏ qua cache, tải dữ liệu mới từ server...');
+      } else {
+        console.log('⚠️ No topics found, trying to load from topics.json...');
+      }
       
       // Try to load from topics.json file
       try {
-        const response = await fetch('./topics.json');
+        // Add cache busting
+        const url = new URL('./topics.json', location.href);
+        url.searchParams.set('v', Date.now());
+        
+        const response = await fetch(url, { 
+          cache: 'no-store',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
         if (response.ok) {
           const topicsData = await response.json();
           console.log('✅ Loaded topics from topics.json:', topicsData.length);
@@ -147,10 +185,15 @@ async function checkAndInitializeData() {
             await saveTopics(topicsData);
             console.log('✅ Saved topics to IndexedDB');
             
+            // Lưu phiên bản hiện tại
+            const currentVersion = window.QUIZ_CONFIG?.DATA_VERSION || 1;
+            await window.db.setConfig('data_version', currentVersion.toString());
+            console.log(`✅ Đã lưu dữ liệu mới với phiên bản ${currentVersion}`);
+            
             // Show success message
             const msgEl = document.getElementById('topic-msg');
             if (msgEl) {
-              msgEl.textContent = `Đã tải ${topicsData.length} chuyên đề từ topics.json`;
+              msgEl.textContent = `Đã tải ${topicsData.length} chuyên đề từ topics.json (v${currentVersion})`;
               msgEl.className = 'ml-2 success';
               setTimeout(() => {
                 msgEl.textContent = '';
@@ -221,11 +264,7 @@ function parseExcelFile(file, callback) {
       }
       
       const questions = rows.map((row, idx) => {
-        let rawAnswer = getCol(row, 'đáp án đúng').toString().trim();
-        let answer = ["1", "2", "3", "4"].includes(rawAnswer) 
-          ? ["A", "B", "C", "D"][parseInt(rawAnswer)-1] 
-          : rawAnswer.toUpperCase();
-        
+        let rawAnswer = getCol(row, 'đáp án đúng').toString();
         let cols = [
           {label: "A", value: getCol(row, 'đáp án a')},
           {label: "B", value: getCol(row, 'đáp án b')},
@@ -243,14 +282,45 @@ function parseExcelFile(file, callback) {
         });
         
         if (!getCol(row, 'câu hỏi')) return null;
-        if (!answer) return null;
-        
-        let validAnswer = false;
-        if (["A", "B", "C", "D"].includes(answer)) {
-          let idxLabel = ["A", "B", "C", "D"].indexOf(answer);
-          validAnswer = cols[idxLabel].value && cols[idxLabel].value.toString().trim() !== "";
-        }
-        if (!validAnswer) return null;
+        if (!rawAnswer) return null;
+
+        // Parse answer(s): support tokens like A, 1, A/1 and multiple separated by commas (e.g., A/1,c/3)
+        const labelsArray = (optionLabels || []).slice(); // e.g., ["A","B","C","D"] but only for non-empty options
+        const toLabel = (token) => {
+          if (!token) return null;
+          const t = String(token).replace(/[\u00A0\s]+/g, '').trim();
+          if (!t) return null;
+          const parts = t.split('/').map(p => p.trim()).filter(Boolean);
+          let letter = null;
+          let number = null;
+          parts.forEach(p => {
+            if (/^[A-Za-z]$/.test(p)) letter = p.toUpperCase();
+            else if (/^\d+$/.test(p)) number = parseInt(p, 10);
+          });
+          if (letter && labelsArray.includes(letter)) return letter;
+          if (Number.isFinite(number) && number >= 1 && number <= labelsArray.length) return labelsArray[number - 1];
+          // If token is just letter or number without '/'
+          const upper = t.toUpperCase();
+          if (/^[A-D]$/.test(upper) && labelsArray.includes(upper)) return upper;
+          const asNum = parseInt(t, 10);
+          if (!Number.isNaN(asNum) && asNum >= 1 && asNum <= labelsArray.length) return labelsArray[asNum - 1];
+          return null;
+        };
+
+        // Accept separators: comma, full-width comma, ideographic comma, semicolon; also allow descriptions before ';'
+        let s = rawAnswer || '';
+        if (s.includes(';')) s = s.substring(s.lastIndexOf(';') + 1);
+        const seps = /[\,\uFF0C；;、]/g;
+        const tokens = s.split(seps).map(x => x.trim()).filter(Boolean);
+        const mapped = Array.from(new Set(tokens.map(toLabel).filter(Boolean)));
+        if (mapped.length === 0) return null; // no valid answers parsed
+
+        // Validate: every mapped label must correspond to an available option label
+        const allValid = mapped.every(lbl => labelsArray.includes(lbl));
+        if (!allValid) return null;
+
+        // Convert to single string if only one answer, else array
+        const answer = mapped.length === 1 ? mapped[0] : mapped;
         
         return {
           question: getCol(row, 'câu hỏi'),
