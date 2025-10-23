@@ -9,6 +9,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="logo.png">
   <!-- Main CSS -->
   <link rel="stylesheet" href="styles.css">
+  <!-- Mobile Quiz Optimization CSS -->
+  <link rel="stylesheet" href="mobile-quiz-optimization.css">
   <!-- Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <!-- Config file -->
@@ -2837,10 +2839,31 @@ function focusNextOrSubmit(){
 
     // Initialize the quiz when DOM is ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initQuiz);
-              } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        initQuiz();
+        moveSidebarToggleToMeta();
+      });
+    } else {
       initQuiz();
+      moveSidebarToggleToMeta();
     }
+    
+    // Di chuyển nút sidebar toggle vào quiz-meta trên mobile
+    function moveSidebarToggleToMeta() {
+      if (window.innerWidth <= 768) {
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+        const quizMeta = document.querySelector('.quiz-meta');
+        
+        if (sidebarToggleBtn && quizMeta) {
+          // Di chuyển nút vào quiz-meta
+          quizMeta.appendChild(sidebarToggleBtn);
+        }
+      }
+    }
+    
+    // Re-position khi resize
+    window.addEventListener('resize', moveSidebarToggleToMeta);
+
   </script>
   <footer style="background: linear-gradient(135deg, #8e0e00 0%, #1f1c18 100%); color: #fff; padding: 15px 15px 10px; margin-top: 30px; position: relative; overflow: hidden;">
     <div style="max-width: 1200px; margin: 0 auto; position: relative; z-index: 1;">
