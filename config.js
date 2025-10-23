@@ -38,7 +38,7 @@ const CONFIG = {
   
   // ⚠️ QUAN TRỌNG: Tăng số này MỖI KHI thay đổi topics.json để buộc tải dữ liệu mới
   // Ví dụ: Thêm câu hỏi mới, sửa đề thi → tăng từ 1 lên 2, 3, 4...
-  DATA_VERSION: 1
+  DATA_VERSION: 2
 };
 
 // Kiểm tra cấu hình
