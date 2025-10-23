@@ -211,7 +211,7 @@
     z-index: 100 !important;
   }
   
-  /* Nút Câu trước - bên trái */
+  /* Nút Câu trước - order 1 */
   #prev-btn {
     min-width: 40px !important;
     width: 40px !important;
@@ -226,7 +226,7 @@
     order: 1 !important;
   }
   
-  /* Nút Câu tiếp - bên phải */
+  /* Nút Câu tiếp - order 2 */
   #next-btn {
     min-width: 40px !important;
     width: 40px !important;
@@ -238,7 +238,7 @@
     justify-content: center !important;
     font-size: 0 !important; /* Ẩn text */
     flex-shrink: 0 !important;
-    order: 4 !important;
+    order: 2 !important;
   }
   
   #prev-btn .material-icons,
@@ -252,7 +252,7 @@
     display: contents !important;
   }
   
-  /* Nút đánh dấu - giống hệt nút nộp bài, cùng kích thước */
+  /* Nút đánh dấu - order 3 */
   #flag-btn {
     min-width: 80px !important;
     width: auto !important;
@@ -267,7 +267,7 @@
     background: var(--primary-color) !important;
     border: 2px solid transparent !important;
     flex-shrink: 0 !important;
-    order: 2 !important;
+    order: 3 !important;
     white-space: nowrap !important;
     font-size: 0.75rem !important;
     font-weight: 600 !important;
@@ -289,7 +289,7 @@
     box-shadow: 0 4px 12px rgba(128, 0, 32, 0.3) !important;
   }
   
-  /* Nút nộp bài - cùng kích thước với nút đánh dấu */
+  /* Nút nộp bài - order 4 */
   #submit-quiz-btn {
     min-height: 36px !important;
     height: 36px !important;
@@ -301,7 +301,7 @@
     min-width: 80px !important;
     width: auto !important;
     flex-shrink: 0 !important;
-    order: 3 !important;
+    order: 4 !important;
     box-sizing: border-box !important;
     line-height: 1 !important;
     display: inline-flex !important;
