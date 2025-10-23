@@ -301,24 +301,24 @@ textarea:focus {
 }
 
 .answer.correct {
-  background: #800020 !important;
+  background: #8B0000 !important; /* Đỏ đậm cho đáp án đúng */
   color: #fff !important;
-  border: 2px solid #800020 !important;
+  border: 2px solid #8B0000 !important;
 }
 
 .answer.incorrect {
-  background: #f7e5ed !important;
-  color: #800020 !important;
-  border: 2px solid #f7e5ed;
+  background: #ffebee !important; /* Đỏ nhạt cho đáp án sai */
+  color: #d32f2f !important;
+  border: 2px solid #ffcdd2 !important;
 }
 .answer.correct .option {
-  background: #800020 !important;
+  background: #8B0000 !important; /* Đỏ đậm cho option đúng */
   color: #fff !important;
 }
 
 .answer.incorrect .option {
-  background: #f7e5ed !important;
-  color: #800020 !important;
+  background: #ffcdd2 !important; /* Đỏ nhạt cho option sai */
+  color: #d32f2f !important;
 }
 .answer.correct::after {
   color: #fff !important;
@@ -1168,15 +1168,15 @@ textarea:focus {
 }
 
 .answer.correct {
-  background: #f6ffed;
-  border-color: #b7eb8f;
-  color: #52c41a;
+  background: #8B0000; /* Đỏ đậm cho đáp án đúng */
+  border-color: #8B0000;
+  color: #fff;
 }
 
 .answer.incorrect {
-  background: #fff2f0;
-  border-color: #ffccc7;
-  color: #ff4d4f;
+  background: #ffebee; /* Đỏ nhạt cho đáp án sai */
+  border-color: #ffcdd2;
+  color: #d32f2f;
   opacity: 0.8;
 }
 
@@ -1605,38 +1605,38 @@ textarea:focus {
 
 /* Answer feedback */
 .answer.correct {
-  background: #e8f5e9;
-  border-color: #a5d6a7;
-  color: #2e7d32;
+  background: #8B0000; /* Đỏ đậm cho đáp án đúng */
+  border-color: #8B0000;
+  color: #fff;
 }
 
 .answer.incorrect {
-  background: #ffebee;
-  border-color: #ef9a9a;
-  color: #c62828;
+  background: #ffebee; /* Đỏ nhạt cho đáp án sai */
+  border-color: #ffcdd2;
+  color: #d32f2f;
 }
 
 .answer.correct .option {
-  background: #2e7d32;
+  background: #8B0000; /* Đỏ đậm cho option đúng */
   color: white;
 }
 
 .answer.incorrect .option {
-  background: #c62828;
-  color: white;
+  background: #ffcdd2; /* Đỏ nhạt cho option sai */
+  color: #d32f2f;
 }
 
 .answer.correct::after {
   content: '✓';
   margin-left: auto;
-  color: #2e7d32;
+  color: #fff; /* Màu trắng cho dấu tích */
   font-weight: bold;
 }
 
 .answer.incorrect::after {
   content: '✗';
   margin-left: auto;
-  color: #c62828;
+  color: #d32f2f; /* Đỏ đậm cho dấu X */
   font-weight: bold;
 }
 
