@@ -38,7 +38,7 @@ const CONFIG = {
   
   // ⚠️ QUAN TRỌNG: Tăng số này MỖI KHI thay đổi topics.json để buộc tải dữ liệu mới
   // Ví dụ: Thêm câu hỏi mới, sửa đề thi → tăng từ 1 lên 2, 3, 4...
-  DATA_VERSION: 2
+  DATA_VERSION: 3
   
   // ⚠️ CACHE VERSION: Tăng số này MỖI KHI thay đổi CSS/JS để buộc tải file mới
   // Ví dụ: Sửa giao diện, thêm tính năng → tăng từ 1 lên 2, 3, 4...
