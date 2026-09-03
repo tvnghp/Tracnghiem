@@ -207,7 +207,163 @@
     </div>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
+      // ========================================================
+      // 🍪 MODULE QUẢN LÝ COOKIE & TỰ ĐỘNG LÀM MỚI KHI QUÁ 30 NGÀY
+      // ========================================================
+      const COOKIE_SETTINGS = {
+        COOKIE_NAME: 'quiz_last_cookie_reset',
+        EXPIRATION_DAYS: 30, // Kiểm tra mốc 30 ngày
+        COOKIE_LIFETIME_DAYS: 365 // Lưu cookie 365 ngày để theo dõi mốc thời gian liên tục
+      };
+
+      function getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+          let c = ca[i].trim();
+          if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length));
+        }
+        return null;
+      }
+
+      function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+          const date = new Date();
+          date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+          expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
+      }
+
+      function deleteCookie(name) {
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname + ";";
+      }
+
+      function clearAllCookies() {
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i];
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name) {
+            deleteCookie(name);
+          }
+        }
+      }
+
+      // Kiểm tra hạn cookie 30 ngày khi load trang web
+      async function checkCookie30Days() {
+        const now = Date.now();
+        const savedTimeStr = getCookie(COOKIE_SETTINGS.COOKIE_NAME);
+
+        // 1. Nếu chưa có cookie (lần đầu truy cập hoặc vừa xóa xong) -> tạo cookie với mốc hiện tại
+        if (!savedTimeStr) {
+          console.log('🍪 [Cookie Check] Chưa có mốc cookie. Thiết lập cookie mới:', new Date(now).toLocaleString());
+          setCookie(COOKIE_SETTINGS.COOKIE_NAME, now.toString(), COOKIE_SETTINGS.COOKIE_LIFETIME_DAYS);
+          return false;
+        }
+
+        const savedTime = parseInt(savedTimeStr, 10);
+        if (isNaN(savedTime)) {
+          setCookie(COOKIE_SETTINGS.COOKIE_NAME, now.toString(), COOKIE_SETTINGS.COOKIE_LIFETIME_DAYS);
+          return false;
+        }
+
+        // 2. Tính số ngày đã lưu
+        const diffMs = now - savedTime;
+        const daysPassed = diffMs / (1000 * 60 * 60 * 24);
+        console.log(`🍪 [Cookie Check] Đã lưu được: ${daysPassed.toFixed(2)} ngày (mốc kiểm tra: ${COOKIE_SETTINGS.EXPIRATION_DAYS} ngày).`);
+
+        // 3. Nếu ĐÃ TRÊN 30 NGÀY
+        if (daysPassed > COOKIE_SETTINGS.EXPIRATION_DAYS) {
+          console.log('⚠️ [Cookie Check] Cookie đã trên 30 ngày! Thông báo xóa cookie và tải lại web...');
+
+          // Hiển thị thông báo cho người dùng
+          alert(
+            '📢 THÔNG BÁO:\n\n' +
+            'Dữ liệu lưu trữ (cookie/cache) của bạn đã quá 30 ngày.\n' +
+            'Hệ thống sẽ tiến hành xóa cookie, làm mới bộ nhớ để cập nhật bộ câu hỏi mới nhất!'
+          );
+
+          // Xóa toàn bộ cookie
+          clearAllCookies();
+
+          // Thiết lập lại mốc cookie mới tính từ hôm nay
+          setCookie(COOKIE_SETTINGS.COOKIE_NAME, now.toString(), COOKIE_SETTINGS.COOKIE_LIFETIME_DAYS);
+
+          // Dọn dẹp cache IndexedDB & Service Worker để chắc chắn lấy bộ câu hỏi mới nhất
+          try {
+            if (window.db && window.db.ready) {
+              await window.db.ready;
+              await window.db.deleteConfig('quiz_topics');
+              await window.db.clearTopics();
+              await window.db.deleteConfig('data_version');
+              await window.db.deleteConfig('topics_signature');
+            }
+            localStorage.removeItem('quiz_topics');
+
+            if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              for (const cacheName of cacheNames) {
+                const cache = await caches.open(cacheName);
+                const requests = await cache.keys();
+                for (const req of requests) {
+                  if (req.url.includes('topics.json') || req.url.includes('config.js')) {
+                    await cache.delete(req);
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Lỗi khi dọn dẹp cache:', err);
+          }
+
+          // Tải lại trang (thêm tham số timestamp để phá cache trình duyệt)
+          const reloadUrl = new URL(window.location.href);
+          reloadUrl.searchParams.set('t', now.toString());
+          window.location.href = reloadUrl.href;
+          return true; // Đang reload
+        }
+
+        // 4. Nếu DƯỚI 30 NGÀY -> Hoạt động bình thường
+        const remainingDays = (COOKIE_SETTINGS.EXPIRATION_DAYS - daysPassed).toFixed(1);
+        console.log(`✅ [Cookie Check] Cookie còn hạn (${remainingDays} ngày nữa). Hoạt động bình thường như hiện tại.`);
+        return false;
+      }
+
+      // Bộ công cụ kiểm thử nhanh trên console trình duyệt
+      window.cookieManager = {
+        getStatus() {
+          const saved = getCookie(COOKIE_SETTINGS.COOKIE_NAME);
+          if (!saved) return { status: 'Chưa có cookie mốc thời gian' };
+          const days = (Date.now() - parseInt(saved, 10)) / (1000 * 60 * 60 * 24);
+          return {
+            createdDate: new Date(parseInt(saved, 10)).toLocaleString(),
+            daysPassed: parseFloat(days.toFixed(2)),
+            remainingDays: parseFloat((COOKIE_SETTINGS.EXPIRATION_DAYS - days).toFixed(2)),
+            isExpiredOver30Days: days > COOKIE_SETTINGS.EXPIRATION_DAYS
+          };
+        },
+        testExpire31Days() {
+          const past31Days = Date.now() - (31 * 24 * 60 * 60 * 1000);
+          setCookie(COOKIE_SETTINGS.COOKIE_NAME, past31Days.toString(), COOKIE_SETTINGS.COOKIE_LIFETIME_DAYS);
+          alert('🧪 Đã thiết lập cookie về 31 ngày trước!\n\nTrang sẽ reload để kích hoạt thông báo xóa cookie và làm mới.');
+          window.location.reload();
+        },
+        resetToday() {
+          setCookie(COOKIE_SETTINGS.COOKIE_NAME, Date.now().toString(), COOKIE_SETTINGS.COOKIE_LIFETIME_DAYS);
+          console.log('✅ Đã đặt lại mốc cookie về ngày hôm nay.');
+        }
+      };
+
+      document.addEventListener('DOMContentLoaded', async function() {
+        // 🍪 Kiểm tra cookie 30 ngày: nếu trên 30 ngày -> thông báo, xóa cookie, làm mới cache và reload
+        const isReloading = await checkCookie30Days();
+        if (isReloading) {
+          return; // Dừng lại vì trang đang reload
+        }
         // 🔄 Auto-cleanup: Xóa localStorage cũ (quiz progress đã chuyển sang IndexedDB)
         // Chỉ giữ lại admin credentials và deleted_review_topics
         const keysToKeep = ['admin_credentials', 'admin_authenticated', 'deleted_review_topics', 'deleted_review_topics_map'];
@@ -1913,6 +2069,29 @@
           } catch (e) {
             console.error('Error checking data version:', e);
           }
+
+          // Tự động kiểm tra file topics.json trên server có cập nhật không (dùng HEAD request để lấy signature)
+          try {
+            const checkUrl = new URL('./topics.json', location.href);
+            checkUrl.searchParams.set('check', Date.now().toString());
+            const headResp = await fetch(checkUrl, { method: 'HEAD', cache: 'no-store' });
+            if (headResp.ok) {
+              const lastMod = headResp.headers.get('Last-Modified') || '';
+              const etag = headResp.headers.get('ETag') || '';
+              const len = headResp.headers.get('Content-Length') || '';
+              const remoteSig = `${lastMod}_${etag}_${len}`;
+              
+              const storedSig = await window.db.getConfig('topics_signature');
+              if (storedSig && remoteSig && storedSig !== remoteSig && remoteSig !== '__') {
+                console.log(`🔄 Phát hiện bộ câu hỏi mới trên server! Tự động tải lại...`);
+                shouldForceReload = true;
+                await window.db.deleteConfig('quiz_topics');
+                await window.db.clearTopics();
+              }
+            }
+          } catch (headErr) {
+            console.log('Kiểm tra HEAD topics.json (offline hoặc không hỗ trợ):', headErr && headErr.message ? headErr.message : headErr);
+          }
           
           // Try to load from IndexedDB first (nếu không bắt buộc reload)
           if (!shouldForceReload) {
@@ -1983,10 +2162,20 @@
                     // Save to IndexedDB instead of localStorage
                     try {
                       if (window.db) {
+                        await window.db.saveTopics(validTopics);
                         await window.db.setConfig('quiz_topics', JSON.stringify(validTopics));
                         // Lưu phiên bản hiện tại
                         const currentVersion = window.QUIZ_CONFIG?.DATA_VERSION || 1;
                         await window.db.setConfig('data_version', currentVersion.toString());
+                        
+                        // Lưu signature của topics.json
+                        const lastMod = resp.headers.get('Last-Modified') || '';
+                        const etag = resp.headers.get('ETag') || '';
+                        const len = resp.headers.get('Content-Length') || '';
+                        const sig = `${lastMod}_${etag}_${len}`;
+                        if (sig !== '__') {
+                          await window.db.setConfig('topics_signature', sig);
+                        }
                         console.log(`✅ Đã lưu dữ liệu mới với phiên bản ${currentVersion}`);
                       }
                     } catch (e) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quiz-cantho-v3-indexeddb-20250111';
+const CACHE_NAME = 'quiz-cantho-v4-cookie-update-20260903';
 const urlsToCache = [
   './',
   './index.html',
@@ -52,6 +52,33 @@ self.addEventListener('activate', function(event) {
 
 // Fetch event
 self.addEventListener('fetch', function(event) {
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  const requestUrl = new URL(event.request.url);
+
+  // Network-First cho topics.json và config.js (ưu tiên lấy file mới nhất trên server khi online, offline dùng cache)
+  if (requestUrl.pathname.endsWith('topics.json') || requestUrl.pathname.endsWith('config.js')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(function(networkResponse) {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(function() {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Cache-First cho các tài nguyên tĩnh khác (CSS, JS, ảnh, HTML)
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
@@ -84,23 +111,6 @@ self.addEventListener('fetch', function(event) {
             return caches.match('./index.html');
           }
         });
-      }
-    )
-  );
-});
-
-// Activate event
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
-    caches.keys().then(function(cacheNames) {
-      return Promise.all(
-        cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+      })
   );
 });
