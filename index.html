@@ -815,23 +815,27 @@
               
               // 1. Clear topics.json cache from IndexedDB
               if (window.db && window.db.ready) {
+                await window.db.ready;
                 await window.db.deleteConfig('quiz_topics');
-                console.log('✅ Đã xóa cache quiz_topics từ IndexedDB');
+                await window.db.clearTopics();
+                await window.db.deleteConfig('data_version');
+                await window.db.deleteConfig('topics_signature');
+                console.log('✅ Đã xóa toàn bộ cache quiz_topics từ IndexedDB');
               }
               
               // 2. Clear legacy localStorage cache (if any)
               localStorage.removeItem('quiz_topics');
               
-              // 3. Clear Service Worker cache for topics.json
+              // 3. Clear Service Worker cache for topics.json & config.js
               if ('caches' in window) {
                 const cacheNames = await caches.keys();
                 for (const cacheName of cacheNames) {
                   const cache = await caches.open(cacheName);
                   const keys = await cache.keys();
                   for (const request of keys) {
-                    if (request.url.includes('topics.json')) {
+                    if (request.url.includes('topics.json') || request.url.includes('config.js')) {
                       await cache.delete(request);
-                      console.log('✅ Đã xóa cache topics.json từ Service Worker');
+                      console.log('✅ Đã xóa cache từ Service Worker:', request.url);
                     }
                   }
                 }
@@ -841,6 +845,7 @@
               await loadTopics();
               
               console.log('✅ Đã tải câu hỏi mới thành công! Danh sách chuyên đề đã được cập nhật.');
+              alert('✅ Đã tải bộ câu hỏi mới thành công!\n\nDanh sách chuyên đề đã được cập nhật bản mới nhất từ server.');
               
             } catch (e) {
               console.error('❌ Lỗi khi tải câu hỏi mới:', e);
@@ -2082,8 +2087,8 @@
               const remoteSig = `${lastMod}_${etag}_${len}`;
               
               const storedSig = await window.db.getConfig('topics_signature');
-              if (storedSig && remoteSig && storedSig !== remoteSig && remoteSig !== '__') {
-                console.log(`🔄 Phát hiện bộ câu hỏi mới trên server! Tự động tải lại...`);
+              if (!storedSig || (remoteSig && storedSig !== remoteSig && remoteSig !== '__')) {
+                console.log(`🔄 Phát hiện bộ câu hỏi mới trên server (signature: ${remoteSig}, stored: ${storedSig})! Tự động tải lại...`);
                 shouldForceReload = true;
                 await window.db.deleteConfig('quiz_topics');
                 await window.db.clearTopics();
@@ -4454,8 +4459,10 @@
                   console.log('✅ New Service Worker activated');
                   
                   // Show notification to reload
-                  if (confirm('🔄 Có phiên bản mới!\n\nNhấn OK để tải lại trang với code mới.')) {
-                    window.location.reload(true);
+                  if (confirm('🔄 Có phiên bản mới!\n\nNhấn OK để tải lại trang với dữ liệu mới nhất.')) {
+                    const reloadUrl = new URL(window.location.href);
+                    reloadUrl.searchParams.set('t', Date.now().toString());
+                    window.location.replace(reloadUrl.href);
                   }
                 }
               });
@@ -4469,8 +4476,10 @@
       // Handle controller change (new SW took control)
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         console.log('🔄 Service Worker controller changed');
-        // Auto reload when new SW takes control
-        window.location.reload(true);
+        // Auto reload when new SW takes control with cache-busting url
+        const reloadUrl = new URL(window.location.href);
+        reloadUrl.searchParams.set('t', Date.now().toString());
+        window.location.replace(reloadUrl.href);
       });
     }
   </script>

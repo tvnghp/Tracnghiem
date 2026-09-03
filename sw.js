@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quiz-cantho-v4-cookie-update-20260903';
+const CACHE_NAME = 'quiz-cantho-v5-mobile-refresh-20260903';
 const urlsToCache = [
   './',
   './index.html',
@@ -57,9 +57,16 @@ self.addEventListener('fetch', function(event) {
   }
 
   const requestUrl = new URL(event.request.url);
+  const isHtml = event.request.mode === 'navigate' || 
+                 event.request.destination === 'document' || 
+                 requestUrl.pathname.endsWith('.html') || 
+                 requestUrl.pathname.endsWith('/');
 
-  // Network-First cho topics.json và config.js (ưu tiên lấy file mới nhất trên server khi online, offline dùng cache)
-  if (requestUrl.pathname.endsWith('topics.json') || requestUrl.pathname.endsWith('config.js')) {
+  const isDataOrConfig = requestUrl.pathname.endsWith('topics.json') || 
+                         requestUrl.pathname.endsWith('config.js');
+
+  // Network-First cho HTML, topics.json và config.js (ưu tiên lấy file mới nhất khi có mạng, offline dùng cache)
+  if (isHtml || isDataOrConfig) {
     event.respondWith(
       fetch(event.request)
         .then(function(networkResponse) {
@@ -72,7 +79,10 @@ self.addEventListener('fetch', function(event) {
           return networkResponse;
         })
         .catch(function() {
-          return caches.match(event.request);
+          return caches.match(event.request).then(function(cachedResponse) {
+            if (cachedResponse) return cachedResponse;
+            if (isHtml) return caches.match('./index.html');
+          });
         })
     );
     return;
