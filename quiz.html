@@ -1007,53 +1007,56 @@ function scrollToQuestion() {
 
     // Initialize quiz
     async function initQuiz() {
-  topicId = getTopicId();
-  
-  // Check for old session using IndexedDB
-  const oldSession = await quizStorage.getProgress(topicId);
+      topicId = getTopicId();
+      
+      // Check for old session using IndexedDB
+      const oldSession = await quizStorage.getProgress(topicId);
 
-  if (oldSession) {
-    try {
-      const sessionData = JSON.parse(oldSession);
-      // Nếu session cũ đã nộp bài thì không hiển thị modal, bắt đầu session mới
-      if (sessionData.quizSubmitted) {
-        await quizStorage.deleteProgress(topicId);
-        await quizStorage.deleteTimerEnd(topicId);
+      if (oldSession) {
+        try {
+          const sessionData = JSON.parse(oldSession);
+          // Nếu session cũ đã nộp bài thì không hiển thị modal, bắt đầu session mới
+          if (sessionData.quizSubmitted) {
+            await quizStorage.deleteProgress(topicId);
+            await quizStorage.deleteTimerEnd(topicId);
+            await quizStorage.deleteExamQuestions(topicId);
+            await continueInitQuiz(false);
+            return;
+          }
+        } catch (e) {
+          // Nếu không parse được thì xóa session cũ và bắt đầu mới
+          console.error('Error parsing session:', e);
+          await quizStorage.deleteProgress(topicId);
+          await quizStorage.deleteExamQuestions(topicId);
+          await continueInitQuiz(false);
+          return;
+        }
+        
+        // Hiển thị modal hỏi người dùng (cho cả chuyên đề và bài thi)
+        const modal = document.getElementById('session-modal');
+        modal.classList.remove('hidden');
+        return new Promise(resolve => {
+          document.getElementById('resume-btn').onclick = async () => {
+            modal.classList.add('hidden');
+            resolve(true);
+          };
+          document.getElementById('new-session-btn').onclick = async () => {
+            // Delete all session data from IndexedDB
+            await quizStorage.deleteProgress(topicId);
+            await quizStorage.deleteTimerEnd(topicId);
+            await quizStorage.deleteExamQuestions(topicId);
+            modal.classList.add('hidden');
+            resolve(false);
+          };
+        }).then((isResume) => continueInitQuiz(isResume));
+      } else {
+        // Không có session cũ -> Bắt đầu lượt thi mới, dọn dẹp cache câu hỏi cũ nếu có
         await quizStorage.deleteExamQuestions(topicId);
-        await continueInitQuiz();
-        return;
+        await continueInitQuiz(false);
       }
-    } catch (e) {
-      // Nếu không parse được thì xóa session cũ và bắt đầu mới
-      console.error('Error parsing session:', e);
-      await quizStorage.deleteProgress(topicId);
-      await continueInitQuiz();
-      return;
     }
-    
-    // Hiển thị modal hỏi người dùng (cho cả chuyên đề và bài thi)
-    const modal = document.getElementById('session-modal');
-    modal.classList.remove('hidden');
-    return new Promise(resolve => {
-      document.getElementById('resume-btn').onclick = async () => {
-        modal.classList.add('hidden');
-        resolve();
-      };
-      document.getElementById('new-session-btn').onclick = async () => {
-        // Delete all session data from IndexedDB
-        await quizStorage.deleteProgress(topicId);
-        await quizStorage.deleteTimerEnd(topicId);
-        await quizStorage.deleteExamQuestions(topicId);
-        modal.classList.add('hidden');
-        resolve();
-      };
-    }).then(() => continueInitQuiz());
-  } else {
-    await continueInitQuiz();
-  }
-}
 
-async function continueInitQuiz() {
+    async function continueInitQuiz(isResume = false) {
   // Initialize DOM elements first
   initDOMElements();
   
@@ -1161,15 +1164,16 @@ async function continueInitQuiz() {
   console.log('Topic examConfig:', topic.examConfig);
   
   // For exams, assemble questions per attempt using current topics based on examConfig
-  if (topic.isExam === true && topic.examConfig && Array.isArray(topic.examConfig.distribution)) {
+  const isExamTopic = topic.isExam === true || (typeof topic.durationMinutes === 'number' && topic.durationMinutes > 0);
+  if (isExamTopic) {
     try {
-      questions = await getOrCreateExamSessionQuestions(topic);
+      questions = await getOrCreateExamSessionQuestions(topic, !isResume);
     } catch (e) {
       console.error('Error getting exam session questions, using fallback:', e);
-      questions = topic.questions || [];
+      questions = (topic.questions || []).map(q => JSON.parse(JSON.stringify(q)));
     }
   } else {
-    questions = topic.questions || [];
+    questions = (topic.questions || []).map(q => JSON.parse(JSON.stringify(q)));
   }
 
   console.log('Questions loaded:', questions.length);
@@ -1180,10 +1184,14 @@ async function continueInitQuiz() {
     return;
   }
 
-  // Shuffle questions and answers nếu không có saved progress
-  const hasSavedProgress = !!(await quizStorage.getProgress(topicId));
+  // Shuffle questions and answers nếu không phải đang khôi phục tiến trình đã lưu
+  const hasSavedProgress = isResume && !!(await quizStorage.getProgress(topicId));
   if (!hasSavedProgress) {
     shuffleQuestionsAndOptions();
+    // Lưu lại bộ câu hỏi đã xáo trộn cho session này để nếu F5 tải lại trang thì giữ nguyên thứ tự
+    if (isExamTopic) {
+      await quizStorage.saveExamQuestions(topic.id, JSON.stringify(questions));
+    }
   }
 
   // Initialize user answers
@@ -1294,32 +1302,25 @@ async function continueInitQuiz() {
     }
 
     // ===== Exam assembly per attempt =====
-    async function getOrCreateExamSessionQuestions(examTopic) {
-      // Try to get cached questions first
-      const cached = await quizStorage.getExamQuestions(examTopic.id);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log('Using cached exam questions:', parsed.length);
-            return parsed;
+    async function getOrCreateExamSessionQuestions(examTopic, forceNew = false) {
+      // Chỉ sử dụng cached questions khi không ép tạo mới (đang tiếp tục session dở dang)
+      if (!forceNew) {
+        const cached = await quizStorage.getExamQuestions(examTopic.id);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              console.log('Using cached exam questions for resumed session:', parsed.length);
+              return parsed;
+            }
+          } catch (e) {
+            console.warn('Error parsing cached exam questions:', e);
           }
-        } catch (e) {
-          console.warn('Error parsing cached exam questions:', e);
         }
       }
       
       // Build new questions
-      const built = buildExamQuestions(examTopic);
-      if (Array.isArray(built) && built.length > 0) {
-        // Try to cache, but don't fail if we can't
-        const saved = await quizStorage.saveExamQuestions(examTopic.id, JSON.stringify(built));
-        if (saved) {
-          console.log('Cached exam questions successfully');
-        } else {
-          console.log('Continuing without caching exam questions');
-        }
-      }
+      const built = await buildExamQuestions(examTopic);
       return built;
     }
 
@@ -1407,52 +1408,151 @@ async function continueInitQuiz() {
       }
     }
 
-    function buildExamQuestions(examTopic) {
+    async function buildExamQuestions(examTopic, sourceTopics = null) {
       try {
-        const allTopics = JSON.parse(safeGetItem('quiz_topics') || '[]');
+        let allTopics = sourceTopics || topics;
+        if (!Array.isArray(allTopics) || allTopics.length === 0) {
+          const topicsStr = await quizStorage.getTopics();
+          allTopics = JSON.parse(topicsStr || '[]');
+        }
+        if (!Array.isArray(allTopics) || allTopics.length === 0) {
+          try {
+            const resp = await fetch('./topics.json?v=' + Date.now(), { cache: 'no-store' });
+            if (resp.ok) {
+              allTopics = await resp.json();
+            }
+          } catch (e) {
+            console.warn('Failed to fetch topics.json in buildExamQuestions:', e);
+          }
+        }
+
         const dist = examTopic.examConfig?.distribution || [];
         const total = parseInt(examTopic.examConfig?.total || 0, 10);
-        if (!Array.isArray(dist) || !Number.isFinite(total) || total <= 0) {
-          console.log('Using fallback questions from examTopic');
-          return examTopic.questions || [];
+        if (!Array.isArray(dist) || dist.length === 0 || !Number.isFinite(total) || total <= 0) {
+          console.log('No valid distribution config, using fallback questions from examTopic');
+          const fallback = Array.isArray(examTopic.questions) ? examTopic.questions.map(q => JSON.parse(JSON.stringify(q))) : [];
+          shuffleArray(fallback);
+          return (total > 0 && fallback.length > total) ? fallback.slice(0, total) : fallback;
         }
 
         // Calculate allocation similar to admin builder
-        const withCalc = dist.map(d => ({ id: d.id, percent: d.percent, exact: (total * d.percent) / 100 }));
-        let allocated = withCalc.map(x => ({ id: x.id, count: Math.floor(x.exact), frac: x.exact - Math.floor(x.exact) }));
+        const withCalc = dist.map(d => ({
+          id: d.id,
+          name: d.name,
+          percent: d.percent,
+          exact: (total * d.percent) / 100
+        }));
+        let allocated = withCalc.map(x => ({
+          id: x.id,
+          name: x.name,
+          count: Math.floor(x.exact),
+          frac: x.exact - Math.floor(x.exact)
+        }));
         let assigned = allocated.reduce((s, a) => s + a.count, 0);
         let remain = total - assigned;
         if (remain > 0) {
           allocated.sort((a, b) => b.frac - a.frac);
-          for (let i = 0; i < allocated.length && remain > 0; i++) { allocated[i].count += 1; remain--; }
+          for (let i = 0; i < allocated.length && remain > 0; i++) {
+            allocated[i].count += 1;
+            remain--;
+          }
         }
 
-        // Sample per topic
+        // Sample per topic with deep copy
         const combined = [];
+        const usedQuestionKeys = new Set();
+
         for (const a of allocated) {
-          const t = allTopics.find(t => t.id === a.id);
-          if (!t || !Array.isArray(t.questions)) {
-            // Missing topic; fallback to existing exam questions
-            console.log('Missing topic, using fallback questions');
-            return examTopic.questions || [];
+          // Tìm topic theo id, name hoặc tiền tố số thứ tự
+          let t = allTopics.find(topic => topic.id === a.id);
+          if (!t && a.name) {
+            t = allTopics.find(topic => topic.name && topic.name.trim() === a.name.trim());
           }
-          if (a.count > t.questions.length) {
-            // Not enough questions; fallback
-            console.log('Not enough questions, using fallback questions');
-            return examTopic.questions || [];
+          if (!t && a.name) {
+            const matchNum = a.name.match(/^(\d+)\./);
+            if (matchNum) {
+              t = allTopics.find(topic => topic.name && topic.name.startsWith(matchNum[1] + '.'));
+            }
           }
-          const copy = t.questions.slice();
-          // shuffle
-          for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
-          combined.push(...copy.slice(0, a.count));
+
+          if (!t || !Array.isArray(t.questions) || t.questions.length === 0) {
+            console.warn(`Topic with id "${a.id}" or name "${a.name}" not found or has no questions`);
+            continue;
+          }
+
+          // Deep clone câu hỏi để không ảnh hưởng dữ liệu gốc khi xáo trộn đáp án
+          const pool = t.questions.map(q => JSON.parse(JSON.stringify(q)));
+          shuffleArray(pool);
+
+          let pickedFromTopic = 0;
+          for (const q of pool) {
+            const key = (q.question || '').trim();
+            if (!usedQuestionKeys.has(key)) {
+              usedQuestionKeys.add(key);
+              combined.push(q);
+              pickedFromTopic++;
+              if (pickedFromTopic >= a.count) break;
+            }
+          }
         }
+
+        // Nếu một chuyên đề nào đó thiếu câu hỏi, bù đắp câu hỏi từ các chuyên đề đã chọn hoặc chuyên đề khác
+        if (combined.length < total) {
+          console.log(`Backfilling missing questions: have ${combined.length}, need ${total}`);
+          const fallbackPool = [];
+          for (const a of allocated) {
+            const t = allTopics.find(topic => topic.id === a.id || (a.name && topic.name === a.name));
+            if (t && Array.isArray(t.questions)) {
+              for (const q of t.questions) {
+                const key = (q.question || '').trim();
+                if (!usedQuestionKeys.has(key)) {
+                  fallbackPool.push(JSON.parse(JSON.stringify(q)));
+                  usedQuestionKeys.add(key);
+                }
+              }
+            }
+          }
+          // Nếu vẫn chưa đủ, lấy thêm từ bất kỳ chuyên đề nào
+          if (combined.length + fallbackPool.length < total) {
+            for (const t of allTopics) {
+              if (t && !t.isExam && Array.isArray(t.questions)) {
+                for (const q of t.questions) {
+                  const key = (q.question || '').trim();
+                  if (!usedQuestionKeys.has(key)) {
+                    fallbackPool.push(JSON.parse(JSON.stringify(q)));
+                    usedQuestionKeys.add(key);
+                  }
+                }
+              }
+            }
+          }
+          // Nếu vẫn thiếu, lấy thêm từ examTopic.questions
+          if (combined.length + fallbackPool.length < total && Array.isArray(examTopic.questions)) {
+            for (const q of examTopic.questions) {
+              const key = (q.question || '').trim();
+              if (!usedQuestionKeys.has(key)) {
+                fallbackPool.push(JSON.parse(JSON.stringify(q)));
+                usedQuestionKeys.add(key);
+              }
+            }
+          }
+
+          shuffleArray(fallbackPool);
+          const needed = total - combined.length;
+          for (let i = 0; i < Math.min(needed, fallbackPool.length); i++) {
+            combined.push(fallbackPool[i]);
+          }
+        }
+
         // final shuffle
-        for (let i = combined.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [combined[i], combined[j]] = [combined[j], combined[i]]; }
-        console.log('Built exam questions successfully:', combined.length);
+        shuffleArray(combined);
+        console.log('Built fresh exam questions successfully:', combined.length);
         return combined;
       } catch (e) {
         console.error('Error building exam questions, using fallback:', e);
-        return examTopic.questions || [];
+        const fallback = Array.isArray(examTopic.questions) ? examTopic.questions.map(q => JSON.parse(JSON.stringify(q))) : [];
+        shuffleArray(fallback);
+        return fallback;
       }
     }
 
@@ -2302,12 +2402,19 @@ function focusNextOrSubmit(){
           // For exams: clear cached selection so a new random set is built
           await quizStorage.deleteExamQuestions(topicId);
           quizSubmitted = false;
-          // Rebuild questions for exams; otherwise reuse topic.questions
-          if (topic.isExam === true && topic.examConfig && Array.isArray(topic.examConfig.distribution)) {
-            questions = await getOrCreateExamSessionQuestions(topic);
+          // Rebuild questions for exams with fresh random set; otherwise deep copy topic.questions
+          const isExamTopic = topic.isExam === true || (typeof topic.durationMinutes === 'number' && topic.durationMinutes > 0);
+          if (isExamTopic) {
+            questions = await getOrCreateExamSessionQuestions(topic, /* forceNew= */ true);
+          } else {
+            questions = (topic.questions || []).map(q => JSON.parse(JSON.stringify(q)));
           }
           // Shuffle order and options for a new attempt
           shuffleQuestionsAndOptions();
+          // Cache the newly shuffled questions for this session
+          if (isExamTopic) {
+            await quizStorage.saveExamQuestions(topic.id, JSON.stringify(questions));
+          }
           userAnswers = questions.map(() => ({
             answer: null,
             correct: null,

@@ -792,6 +792,12 @@ async function saveEditExam(e) {
   const idx = topics.findIndex(t => t.id === id && t.isExam);
   if (idx === -1) { msg.textContent = 'Không tìm thấy bài thi!'; return; }
   
+  // Gắn thêm tên chuyên đề vào distribution để đối soát
+  dist.forEach(d => {
+    const t = topics.find(topic => topic.id === d.id);
+    if (t) d.name = t.name;
+  });
+  
   topics[idx].name = name;
   topics[idx].durationMinutes = durationMinutes;
   topics[idx].allowPause = allowPause;
@@ -1346,8 +1352,14 @@ async function buildCompositeExam(e) {
     return;
   }
 
-  const withCalc = dist.map(d => ({ id: d.id, percent: d.percent, exact: (total * d.percent) / 100 }));
-  let allocated = withCalc.map(x => ({ id: x.id, count: Math.floor(x.exact), frac: x.exact - Math.floor(x.exact) }));
+  // Gắn thêm tên chuyên đề vào distribution để đối soát
+  dist.forEach(d => {
+    const t = allTopics.find(topic => topic.id === d.id);
+    if (t) d.name = t.name;
+  });
+
+  const withCalc = dist.map(d => ({ id: d.id, name: d.name, percent: d.percent, exact: (total * d.percent) / 100 }));
+  let allocated = withCalc.map(x => ({ id: x.id, name: x.name, count: Math.floor(x.exact), frac: x.exact - Math.floor(x.exact) }));
   let assigned = allocated.reduce((s, a) => s + a.count, 0);
   let remain = total - assigned;
   if (remain > 0) {
@@ -1366,7 +1378,8 @@ async function buildCompositeExam(e) {
       msg.textContent = `Chuyên đề "${topic.name}" không đủ câu hỏi (${a.count}/${topic.questions.length}). Giảm tỷ lệ hoặc tổng số câu.`;
       return;
     }
-    const shuffled = shuffleArray(topic.questions.slice());
+    const pool = topic.questions.map(q => JSON.parse(JSON.stringify(q)));
+    const shuffled = shuffleArray(pool);
     pickPerTopic[a.id] = shuffled.slice(0, a.count);
   }
 
